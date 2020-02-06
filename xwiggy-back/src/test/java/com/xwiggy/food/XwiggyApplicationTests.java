@@ -56,14 +56,14 @@ public class XwiggyApplicationTests {
         Assert.assertEquals(50,food1.getPrice());
     }
 
-    @Test
-    public void checkCartDb(){
-        List<Cart> carts = cartDao.getAllCart();
-        Cart zero = carts.get(0);
-        Assert.assertEquals(0,zero.getQuantity1());
-        Assert.assertEquals(0,zero.getQuantity2());
-        Assert.assertEquals(0,zero.getQuantity3());
-    }
+    // @Test
+    // public void checkCartDb(){
+    //     List<Cart> carts = cartDao.getAllCart();
+    //     Cart zero = carts.get(0);
+    //     Assert.assertEquals(0,zero.getQuantity1());
+    //     Assert.assertEquals(0,zero.getQuantity2());
+    //     Assert.assertEquals(0,zero.getQuantity3());
+    // }
 
     /*Test*/
 
