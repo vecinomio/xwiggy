@@ -2,11 +2,11 @@
 #
 # Add variables at first:
 # Region="us-east-1"
-# VPCName="Runple"
+# VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name ${Environment}${VPCName}VPC --template-file ops/cfn/vpc.yml --parameter-overrides Environment=${Environment} --region ${Region}
+# aws cloudformation deploy --stack-name ${Environment}${VPCName} --template-file ops/cfn/vpc.yml --parameter-overrides Environment=${Environment} --region ${Region}
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name ${Environment}${VPCName}VPC
 ---
