@@ -1,19 +1,20 @@
-# Creates one-to-one ASG with Bastion-host in Public subnets.
+# Creates ASG with Bastion-host in Public subnets.
 #
 # Add variables at first:
 # Region="us-east-1"
 # VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
+# KeyName="favorite"
 # HostedZoneName="miit.pp.ua"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name bastion --template-file ops/cfn/bastion.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM
+# aws cloudformation deploy --stack-name bastion --template-file ops/cfn/bastion.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name bastion
 ---
   AWSTemplateFormatVersion: '2010-09-09'
 
-  Description: 'Creates one-to-one ASG with Bastion-host in Public subnets.'
+  Description: 'ASG with Bastion-host in Public subnets.'
 
   Parameters:
     VPCStackName:
@@ -21,18 +22,13 @@
     KeyName:
       Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
       Type: 'AWS::EC2::KeyPair::KeyName'
-      Default: favorite
       ConstraintDescription: must be the name of an existing EC2 KeyPair.
     InstanceType:
       Type: String
       Description: Type of EC2 instance.
       Default: t2.micro
-      AllowedValues: [ t2.micro, t2.small, t2.medium ]
+      AllowedValues: [ t2.micro, t2.small, t2.medium, t3.micro, t3.small, t3.medium ]
       ConstraintDescription: Must be a valid EC2 instance type.
-    VolumeSize:
-      Type: Number
-      Description: Volume-size of persistent EBS for Bastion-host in Gb
-      Default: 10
     HostedZoneName:
       Type: String
       Description: Project hosted zone.
@@ -47,9 +43,15 @@
   Mappings:
     RegionMap:
       us-east-1:
-        AMI: ami-0b69ea66ff7391e80 # Amazon Linux 2
+        AMI: ami-062f7200baf2fa504 # Amazon Linux 2 (64-bit x86)
+      us-east-2:
+        AMI: ami-02ccb28830b645a41 # Amazon Linux 2 (64-bit x86)
       us-west-1:
-        AMI: ami-0245d318c6788de52 # Amazon Linux 2
+        AMI: ami-03caa3f860895f82e # Amazon Linux 2 (64-bit x86)
+      us-west-2:
+        AMI: ami-04590e7389a6e577c # Amazon Linux 2 (64-bit x86)
+      ca-central-1:
+        AMI: ami-0a269ca7cc3e3beff # Amazon Linux 2 (64-bit x86)
 
   Resources:
     BastionSecurityGroup:
@@ -71,6 +73,14 @@
 
     BastionEIP:
       Type: AWS::EC2::EIP
+      Properties:
+        Tags:
+          - Key: 'Name'
+            Value: 'bastionEIP'
+          - Key: "Environment"
+            Value: !Ref Environment
+          - Key: "Description"
+            Value: "Persistent EIP for Bastion-host"
 
     BastionRecordSet:
       Type: AWS::Route53::RecordSet
@@ -82,92 +92,10 @@
         TTL: '60'
         ResourceRecords: [ !Ref BastionEIP ]
 
-    BastionVolume:
-      Type: AWS::EC2::Volume
-      Properties:
-        AvailabilityZone: !Sub "${AWS::Region}a"
-        Encrypted: No
-        Size: !Ref VolumeSize
-        Tags:
-          - Key: 'Name'
-            Value: 'BastionEBS'
-          - Key: 'Environment'
-            Value: !Ref Environment
-          - Key: 'BackupByLifecycle'
-            Value: 'daily'
-        VolumeType: gp2
-
-    DLMRole:
-      Type: AWS::IAM::Role
-      Properties:
-        Description: 'Role for Lifecicle. Needs to creating and managing Snapshots
-                      of the Bation Persistent Volume.'
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: 'Allow'
-              Principal:
-                Service:
-                  - 'dlm.amazonaws.com'
-              Action:
-                  - 'sts:AssumeRole'
-        Path: '/'
-        Policies:
-          - PolicyName: 'LifecicleForBastionEbs'
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: 'Allow'
-                  Action:
-                    - ec2:CreateSnapshot
-                    - ec2:CreateSnapshots
-                    - ec2:DeleteSnapshot
-                    - ec2:DescribeInstances
-                    - ec2:DescribeSnapshots
-                    - ec2:DescribeSnapshotAttribute
-                    - ec2:DescribeVolumes
-                    - ec2:DescribeVolumeAttribute
-                    - ec2:DescribeVolumeStatus
-                    - ec2:DescribeVolumesModifications
-                    - ec2:DescribeTags
-                  Resource: '*'
-                - Effect: 'Allow'
-                  Action:
-                    - ec2:CreateTags
-                  Resource: 'arn:aws:ec2:*::snapshot/*'
-
-    BastionLifecyclePolicy:
-      Type: "AWS::DLM::LifecyclePolicy"
-      Properties:
-        Description: 'Lifecycle Policy for BastionEBS'
-        ExecutionRoleArn: !GetAtt DLMRole.Arn
-        State: 'ENABLED'
-        PolicyDetails:
-          ResourceTypes:
-            - 'VOLUME'
-          TargetTags:
-            - Key: 'BackupByLifecycle'
-              Value: 'daily'
-          Schedules:
-            -
-              Name: 'Daily Snapshots'
-              TagsToAdd:
-                - Key: 'type'
-                  Value: 'DailySnapshot'
-              CreateRule:
-                Interval: 24
-                IntervalUnit: 'HOURS'
-                Times:
-                  - '01:00'
-              RetainRule:
-                Count: 5
-              CopyTags: true
-
     BastionRole:
       Type: AWS::IAM::Role
       Properties:
-        Description: 'Role for Bastion-host. Needs to attaching EBS and
-                     associate/disassociate EIP for itself.'
+        Description: 'Role for Bastion-host. Needs to associate EIP.'
         RoleName: 'BastionRole'
         Path: '/'
         AssumeRolePolicyDocument:
@@ -180,7 +108,7 @@
               Action:
                 - sts:AssumeRole
         Policies:
-          - PolicyName: 'AttachingEIPandVolumeToBastion'
+          - PolicyName: 'EIPtoBastion'
             PolicyDocument:
               Version: '2012-10-17'
               Statement:
@@ -188,9 +116,9 @@
                   Resource: '*'
                   Action:
                     - ec2:AssociateAddress
-                    - ec2:DisassociateAddress
-                    - ec2:AttachVolume
-                    - ec2:DescribeVolumes
+        Tags:
+          - Key: 'Name'
+            Value: 'bastionRole'
 
     BastionInstanceProfile:
       Type: AWS::IAM::InstanceProfile
@@ -211,35 +139,20 @@
               http://169.254.169.254/latest/meta-data/instance-id)
               allocationID=${AllocationId}
               region=${Region}
-              volumeID=${VolumeId}
-              volumeDevice=/dev/xvdf
-              mountDir=/bastionData
               function retryCommand() {
                   local ATTEMPTS="$1"
                   local SLEEP="$2"
                   local FUNCTION="$3"
                   for i in $(seq 1 $ATTEMPTS); do
                       [ $i == 1 ] || sleep $SLEEP
-                      eval $FUNCTION && echo $? && break || echo $?
+                      eval $FUNCTION && break
                   done
               }
+              hostnamectl set-hostname bastion
               echo ---------------------ASSOCIATING EIP-----------------------
               retryCommand 5 10 "aws ec2 associate-address --instance-id \
               $instanceID --allocation-id $allocationID --region $region"
-              echo ---------------------ATTACHING VOLUME----------------------
-              aws ec2 describe-volumes --region us-east-1
-              retryCommand 5 10 "aws ec2 attach-volume --volume-id $volumeID \
-              --instance-id $instanceID --device $volumeDevice \
-              --region $region"
-              echo ---------------------MOUNTING VOLUME-----------------------
-              retryCommand 5 10 "yum install -y xfsprogs"
-              retryCommand 5 10 "mkfs.xfs $volumeDevice"
-              mkdir $mountDir
-              mount $volumeDevice $mountDir
-              echo "$volumeDevice  $mountDir  xfs  defaults,nofail  0  2" \
-              >> /etc/fstab
             - AllocationId: !GetAtt BastionEIP.AllocationId
-              VolumeId: !Ref BastionVolume
               Region: !Ref 'AWS::Region'
         AssociatePublicIpAddress: true
         ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
@@ -254,13 +167,14 @@
       Properties:
         VPCZoneIdentifier:
           - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnet0"
+            Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnet1"
         LaunchConfigurationName: !Ref LaunchConfig
         MinSize: '1'
         MaxSize: '2'
         DesiredCapacity: !Ref DesiredCapacity
         Tags:
           - Key: 'Name'
-            Value: 'bastion-ASG'
+            Value: 'bastion'
             PropagateAtLaunch: true
           - Key: 'Environment'
             Value: !Ref Environment
