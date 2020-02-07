@@ -1,10 +1,14 @@
-# Creates custom VPC with two public and at least two private subnets (one in each AZ),
-# and NAT Gateways
+# Creates custom VPC across 2 AZs, 2 public and 4 private subnets, 2 NAT Gateways.
 #
-# For manual creation/update use:
-# aws cloudformation deploy --stack-name RunpleVPC --template-file ops/cfn/vpc.yml --parameter-overrides Environment=Dev --region us-east-1
+# Add variables at first:
+# Region="us-east-1"
+# VPCName="Runple"
+# Environment="Dev" or "Prod"
+#
+# To create/update stack use:
+# aws cloudformation deploy --stack-name ${Environment}${VPCName}VPC --template-file ops/cfn/vpc.yml --parameter-overrides Environment=${Environment} --region ${Region}
 # To delete stack use:
-# aws cloudformation delete-stack --stack-name RunpleVPC
+# aws cloudformation delete-stack --stack-name ${Environment}${VPCName}VPC
 ---
   AWSTemplateFormatVersion: "2010-09-09"
 
