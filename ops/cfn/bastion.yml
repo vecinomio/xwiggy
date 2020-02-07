@@ -13,17 +13,15 @@
 ---
   AWSTemplateFormatVersion: '2010-09-09'
 
-  Description: 'Creates AutoScalingGroup with only one Bastion-host.
-                Attaches EIP and Persistent Storage to it.'
+  Description: 'Creates one-to-one ASG with Bastion-host in Public subnets.'
 
   Parameters:
     VPCStackName:
       Type: String
-      AllowedValues: [ DevVPC, ProdVPC ]
     KeyName:
       Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
       Type: 'AWS::EC2::KeyPair::KeyName'
-      Default: devopsa3
+      Default: favorite
       ConstraintDescription: must be the name of an existing EC2 KeyPair.
     InstanceType:
       Type: String
