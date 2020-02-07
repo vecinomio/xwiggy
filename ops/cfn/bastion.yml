@@ -1,5 +1,15 @@
-# To Create Bastion Stack:
-# aws cloudformation deploy --stack-name bastion --template-file ops/cloudformation/bastion.yml --parameter-overrides VPCStackName=${VPCStackName} Environment=${Environment} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM
+# Creates one-to-one ASG with Bastion-host in Public subnets.
+#
+# Add variables at first:
+# Region="us-east-1"
+# VPCName="RunpleVPC"
+# Environment="Dev" or "Prod"
+# HostedZoneName="miit.pp.ua"
+#
+# To create/update stack use:
+# aws cloudformation deploy --stack-name bastion --template-file ops/cfn/bastion.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM
+# To delete stack use:
+# aws cloudformation delete-stack --stack-name bastion
 ---
   AWSTemplateFormatVersion: '2010-09-09'
 
