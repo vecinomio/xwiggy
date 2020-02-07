@@ -1,4 +1,4 @@
-# Creates VPC stack with two public and two private subnets (one in each AZ),
+# Creates custom VPC with two public and at least two private subnets (one in each AZ),
 # and NAT Gateways
 #
 # For manual creation/update use:
@@ -33,10 +33,10 @@
       Private1:
         Dev: "172.16.128.0/18"
         Prod: "10.0.128.0/18"
-      DB0:
+      Private2:
         Dev: "172.16.192.0/19"
         Prod: "10.0.192.0/19"
-      DB1:
+      Private3:
         Dev: "172.16.224.0/19"
         Prod: "10.0.224.0/19"
 
@@ -124,7 +124,7 @@
           - Key: "Name"
             Value: "PrivateSubnet1"
 
-    DbSubnet0:
+    PrivateSubnet2:
       Type: "AWS::EC2::Subnet"
       Properties:
         VpcId: !Ref "VPC"
@@ -132,14 +132,14 @@
           !Sub
             - "${AWS::Region}${AZ}"
             - AZ: !Select [ 0, !FindInMap [ "AZRegions", !Ref "AWS::Region", "PrivateAZs" ] ]
-        CidrBlock: !FindInMap [ "SubnetConfig", "DB0", !Ref Environment ]
+        CidrBlock: !FindInMap [ "SubnetConfig", "Private2", !Ref Environment ]
         Tags:
           - Key: "Environment"
             Value: !Ref Environment
           - Key: "Name"
-            Value: "DbSubnet0"
+            Value: "PrivateSubnet2"
 
-    DbSubnet1:
+    PrivateSubnet3:
       Type: "AWS::EC2::Subnet"
       Properties:
         VpcId: !Ref "VPC"
@@ -147,12 +147,12 @@
           !Sub
             - "${AWS::Region}${AZ}"
             - AZ: !Select [ 1, !FindInMap [ "AZRegions", !Ref "AWS::Region", "PrivateAZs" ] ]
-        CidrBlock: !FindInMap [ "SubnetConfig", "DB1", !Ref Environment ]
+        CidrBlock: !FindInMap [ "SubnetConfig", "Private3", !Ref Environment ]
         Tags:
           - Key: "Environment"
             Value: !Ref Environment
           - Key: "Name"
-            Value: "DbSubnet1"
+            Value: "PrivateSubnet3"
 
     InternetGateway:
       Type: "AWS::EC2::InternetGateway"
@@ -350,6 +350,18 @@
         SubnetId: !Ref "PrivateSubnet1"
         RouteTableId: !Ref "PrivateRouteTable1"
 
+    PrivateSubnetRouteTableAssociation2:
+      Type: "AWS::EC2::SubnetRouteTableAssociation"
+      Properties:
+        SubnetId: !Ref "PrivateSubnet2"
+        RouteTableId: !Ref "PrivateRouteTable0"
+
+    PrivateSubnetRouteTableAssociation3:
+      Type: "AWS::EC2::SubnetRouteTableAssociation"
+      Properties:
+        SubnetId: !Ref "PrivateSubnet3"
+        RouteTableId: !Ref "PrivateRouteTable1"
+
   Outputs:
     VPC:
       Description: "VPCId of VPC"
@@ -389,14 +401,14 @@
       Export:
         Name: !Sub "${AWS::StackName}-PrivateSubnet1"
 
-    DbSubnet0:
-      Description: "SubnetId of DataBase subnet 0"
-      Value: !Ref "DbSubnet0"
+    PrivateSubnet2:
+      Description: "SubnetId of private subnet 2"
+      Value: !Ref "PrivateSubnet2"
       Export:
-        Name: !Sub "${AWS::StackName}-DbSubnet0"
+        Name: !Sub "${AWS::StackName}-PrivateSubnet2"
 
-    DbSubnet1:
-      Description: "SubnetId of DataBase subnet 1"
-      Value: !Ref "DbSubnet1"
+    PrivateSubnet3:
+      Description: "SubnetId of private subnet 3"
+      Value: !Ref "PrivateSubnet3"
       Export:
-        Name: !Sub "${AWS::StackName}-DbSubnet1"
+        Name: !Sub "${AWS::StackName}-PrivateSubnet3"
