@@ -1,0 +1,173 @@
+# Creates ASG with Bastion-host in Public subnets.
+#
+# Add variables:
+# Region="us-east-1"
+# VPCName="RunpleVPC"
+# Environment="Dev" or "Prod"
+# KeyName="main-nvirginia"
+# HostedZoneName="miit.pp.ua"
+#
+# To create/update stack use:
+# aws cloudformation deploy --stack-name bastion --template-file ops/cfn/bastion.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
+#
+# To delete stack use:
+# aws cloudformation delete-stack --stack-name bastion --region ${Region}
+---
+  AWSTemplateFormatVersion: '2010-09-09'
+
+  Description: 'ASG with Bastion-host in Public subnets.'
+
+  Parameters:
+    VPCStackName:
+      Type: String
+    KeyName:
+      Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+      Type: 'AWS::EC2::KeyPair::KeyName'
+      ConstraintDescription: must be the name of an existing EC2 KeyPair.
+    InstanceType:
+      Type: String
+      Description: Type of EC2 instance.
+      Default: t2.micro
+      AllowedValues: [ t2.micro, t2.small, t2.medium, t3.micro, t3.small, t3.medium ]
+      ConstraintDescription: Must be a valid EC2 instance type.
+    HostedZoneName:
+      Type: String
+      Description: Project hosted zone.
+    DesiredCapacity:
+      Type: Number
+      Description: Desired number of instances in ASG.
+      Default: 1
+    Environment:
+      Type: String
+      Description: Dev or Prod
+    BastionHostAmiId:
+      Description: |
+        SSM Public Parameter (https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-public-parameters.html)
+      Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+      Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+
+  Resources:
+    BastionSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Enable SSH access via port 22
+        VpcId:
+          Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: 0.0.0.0/0
+        Tags:
+          - Key: 'Name'
+            Value: 'bastionSG'
+          - Key: 'Environment'
+            Value: !Ref Environment
+
+    BastionEIP:
+      Type: AWS::EC2::EIP
+      Properties:
+        Tags:
+          - Key: 'Name'
+            Value: 'bastionEIP'
+          - Key: "Environment"
+            Value: !Ref Environment
+          - Key: "Description"
+            Value: "Persistent EIP for Bastion-host"
+
+    BastionRecordSet:
+      Type: AWS::Route53::RecordSet
+      Properties:
+        HostedZoneName: !Sub '${HostedZoneName}.'
+        Comment: DNS name for Bastion-host
+        Name: !Sub 'bastion.${HostedZoneName}.'
+        Type: A
+        TTL: '60'
+        ResourceRecords: [ !Ref BastionEIP ]
+
+    BastionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Description: 'Role for Bastion-host. Needs to associate EIP.'
+        RoleName: 'BastionRole'
+        Path: '/'
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ec2.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: 'EIPtoBastion'
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Resource: '*'
+                  Action:
+                    - ec2:AssociateAddress
+        Tags:
+          - Key: 'Name'
+            Value: 'bastionRole'
+
+    BastionInstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        Path: '/'
+        Roles:
+          - Ref: BastionRole
+
+    LaunchConfig:
+      Type: AWS::AutoScaling::LaunchConfiguration
+      Properties:
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash -x
+            echo -------------------------START-----------------------------
+            instanceID=$(curl -s \
+            http://169.254.169.254/latest/meta-data/instance-id)
+            function retryCommand() {
+                local ATTEMPTS="$1"
+                local SLEEP="$2"
+                local FUNCTION="$3"
+                for i in $(seq 1 $ATTEMPTS); do
+                    [ $i == 1 ] || sleep $SLEEP
+                    eval $FUNCTION && break
+                done
+            }
+            hostnamectl set-hostname bastion
+            echo ---------------------ASSOCIATING EIP-----------------------
+            retryCommand 5 10 "aws ec2 associate-address \
+              --instance-id $instanceID \
+              --allocation-id ${BastionEIP.AllocationId} \
+              --region ${AWS::Region}"
+            echo -------------------------FINISH----------------------------
+        AssociatePublicIpAddress: true
+        ImageId: !Ref BastionHostAmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        IamInstanceProfile: !Ref BastionInstanceProfile
+        SecurityGroups:
+          - !Ref BastionSecurityGroup
+
+    BastionAutoScalingGroup:
+      Type: AWS::AutoScaling::AutoScalingGroup
+      Properties:
+        VPCZoneIdentifier:
+          - Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnet0"
+            Fn::ImportValue: !Sub "${VPCStackName}-PublicSubnet1"
+        LaunchConfigurationName: !Ref LaunchConfig
+        MinSize: '1'
+        MaxSize: '2'
+        DesiredCapacity: !Ref DesiredCapacity
+        Tags:
+          - Key: 'Name'
+            Value: 'bastion'
+            PropagateAtLaunch: true
+          - Key: 'Environment'
+            Value: !Ref Environment
+            PropagateAtLaunch: true
