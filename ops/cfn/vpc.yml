@@ -46,6 +46,21 @@
         Prod: "10.0.224.0/19"
 
     AZRegions:
+      eu-central-1:
+        PublicAZs: [ "a", "b" ]
+        PrivateAZs: [ "a", "b" ]
+      eu-west-1:
+        PublicAZs: [ "a", "b" ]
+        PrivateAZs: [ "a", "b" ]
+      eu-west-2:
+        PublicAZs: [ "a", "b" ]
+        PrivateAZs: [ "a", "b" ]
+      eu-west-3:
+        PublicAZs: [ "a", "b" ]
+        PrivateAZs: [ "a", "b" ]
+      eu-north-1:
+        PublicAZs: [ "a", "b" ]
+        PrivateAZs: [ "a", "b" ]
       us-east-1:
         PublicAZs: [ "a", "b" ]
         PrivateAZs: [ "a", "b" ]
@@ -62,6 +77,7 @@
         PublicAZs: [ "a", "b" ]
         PrivateAZs: [ "a", "b" ]
 
+
   Resources:
     VPC:
       Type: "AWS::EC2::VPC"
@@ -74,7 +90,6 @@
             Value: !Ref Environment
           - Key: "Name"
             Value: "RunpleVPC"
-
 
     PublicSubnet0:
       Type: "AWS::EC2::Subnet"
@@ -261,9 +276,6 @@
         SubnetId: !Ref "PublicSubnet1"
         NetworkAclId: !Ref "PublicNetworkAcl"
 
-
-
-
     ElasticIP0:
       Type: "AWS::EC2::EIP"
       Properties:
@@ -352,7 +364,6 @@
         DestinationCidrBlock: "0.0.0.0/0"
         NatGatewayId: !Ref "NATGateway1"
 
-
     PrivateSubnetRouteTableAssociation0:
       Type: "AWS::EC2::SubnetRouteTableAssociation"
       Properties:
@@ -376,6 +387,7 @@
       Properties:
         SubnetId: !Ref "PrivateSubnet3"
         RouteTableId: !Ref "PrivateRouteTable1"
+
 
   Outputs:
     VPC:
