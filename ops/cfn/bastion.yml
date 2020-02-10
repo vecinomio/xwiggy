@@ -4,14 +4,14 @@
 # Region="us-east-1"
 # VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
-# KeyName="favorite"
+# KeyName="main-nvirginia"
 # HostedZoneName="miit.pp.ua"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name bastion --template-file ops/cfn/bastion.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM
+# aws cloudformation deploy --stack-name bastion --template-file ops/cfn/bastion.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
 #
 # To delete stack use:
-# aws cloudformation delete-stack --stack-name bastion
+# aws cloudformation delete-stack --stack-name bastion --region ${Region}
 ---
   AWSTemplateFormatVersion: '2010-09-09'
 
@@ -46,18 +46,6 @@
       Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
       Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
 
-  # Mappings:
-  #   RegionMap:
-  #     us-east-1:
-  #       AMI: ami-062f7200baf2fa504 # Amazon Linux 2 (64-bit x86)
-  #     us-east-2:
-  #       AMI: ami-02ccb28830b645a41 # Amazon Linux 2 (64-bit x86)
-  #     us-west-1:
-  #       AMI: ami-03caa3f860895f82e # Amazon Linux 2 (64-bit x86)
-  #     us-west-2:
-  #       AMI: ami-04590e7389a6e577c # Amazon Linux 2 (64-bit x86)
-  #     ca-central-1:
-  #       AMI: ami-0a269ca7cc3e3beff # Amazon Linux 2 (64-bit x86)
 
   Resources:
     BastionSecurityGroup:
@@ -159,7 +147,6 @@
               --region ${AWS::Region}"
             echo -------------------------FINISH----------------------------
         AssociatePublicIpAddress: true
-        # ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
         ImageId: !Ref BastionHostAmiId
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
