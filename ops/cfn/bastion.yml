@@ -1,6 +1,6 @@
 # Creates ASG with Bastion-host in Public subnets.
 #
-# Add variables at first:
+# Add variables:
 # Region="us-east-1"
 # VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
