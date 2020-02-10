@@ -268,59 +268,59 @@
 
 
 
-    # ElasticIP0:
-    #   Type: "AWS::EC2::EIP"
-    #   Properties:
-    #     Domain: "vpc"
-    #     Tags:
-    #       - Key: "Environment"
-    #         Value: !Ref Environment
-    #       - Key: "Name"
-    #         Value: "EIP0"
-    #       - Key: "Description"
-    #         Value: "For NatGateway0"
-    #   DependsOn: InternetGateway
-    #
-    # ElasticIP1:
-    #   Type: "AWS::EC2::EIP"
-    #   Properties:
-    #     Domain: "vpc"
-    #     Tags:
-    #       - Key: "Environment"
-    #         Value: !Ref Environment
-    #       - Key: "Name"
-    #         Value: "EIP1"
-    #       - Key: "Description"
-    #         Value: "For NatGateway1"
-    #   DependsOn: InternetGateway
-    #
-    # NATGateway0:
-    #   Type: "AWS::EC2::NatGateway"
-    #   Properties:
-    #     AllocationId:
-    #       Fn::GetAtt:
-    #         - "ElasticIP0"
-    #         - "AllocationId"
-    #     SubnetId: !Ref "PublicSubnet0"
-    #     Tags:
-    #       - Key: "Environment"
-    #         Value: !Ref Environment
-    #       - Key: "Name"
-    #         Value: "NAT0"
-    #
-    # NATGateway1:
-    #   Type: "AWS::EC2::NatGateway"
-    #   Properties:
-    #     AllocationId:
-    #       Fn::GetAtt:
-    #         - "ElasticIP1"
-    #         - "AllocationId"
-    #     SubnetId: !Ref "PublicSubnet1"
-    #     Tags:
-    #       - Key: "Environment"
-    #         Value: !Ref Environment
-    #       - Key: "Name"
-    #         Value: "NAT1"
+    ElasticIP0:
+      Type: "AWS::EC2::EIP"
+      Properties:
+        Domain: "vpc"
+        Tags:
+          - Key: "Environment"
+            Value: !Ref Environment
+          - Key: "Name"
+            Value: "EIP0"
+          - Key: "Description"
+            Value: "For NatGateway0"
+      DependsOn: InternetGateway
+
+    ElasticIP1:
+      Type: "AWS::EC2::EIP"
+      Properties:
+        Domain: "vpc"
+        Tags:
+          - Key: "Environment"
+            Value: !Ref Environment
+          - Key: "Name"
+            Value: "EIP1"
+          - Key: "Description"
+            Value: "For NatGateway1"
+      DependsOn: InternetGateway
+
+    NATGateway0:
+      Type: "AWS::EC2::NatGateway"
+      Properties:
+        AllocationId:
+          Fn::GetAtt:
+            - "ElasticIP0"
+            - "AllocationId"
+        SubnetId: !Ref "PublicSubnet0"
+        Tags:
+          - Key: "Environment"
+            Value: !Ref Environment
+          - Key: "Name"
+            Value: "NAT0"
+
+    NATGateway1:
+      Type: "AWS::EC2::NatGateway"
+      Properties:
+        AllocationId:
+          Fn::GetAtt:
+            - "ElasticIP1"
+            - "AllocationId"
+        SubnetId: !Ref "PublicSubnet1"
+        Tags:
+          - Key: "Environment"
+            Value: !Ref Environment
+          - Key: "Name"
+            Value: "NAT1"
 
     PrivateRouteTable0:
       Type: "AWS::EC2::RouteTable"
@@ -347,16 +347,15 @@
       Properties:
         RouteTableId: !Ref "PrivateRouteTable0"
         DestinationCidrBlock: "0.0.0.0/0"
-#        NatGatewayId: !Ref "NATGateway0"
-        GatewayId: !Ref "InternetGateway"
+        NatGatewayId: !Ref "NATGateway0"
 
     PrivateRouteToInternet1:
       Type: "AWS::EC2::Route"
       Properties:
         RouteTableId: !Ref "PrivateRouteTable1"
         DestinationCidrBlock: "0.0.0.0/0"
-#        NatGatewayId: !Ref "NATGateway1"
-        GatewayId: !Ref "InternetGateway"
+        NatGatewayId: !Ref "NATGateway1"
+
 
     PrivateSubnetRouteTableAssociation0:
       Type: "AWS::EC2::SubnetRouteTableAssociation"
