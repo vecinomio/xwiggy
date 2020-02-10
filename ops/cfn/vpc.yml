@@ -122,7 +122,6 @@
             Value: !Ref Environment
           - Key: "Name"
             Value: "PrivateSubnet0"
-        MapPublicIpOnLaunch: true
 
     PrivateSubnet1:
       Type: "AWS::EC2::Subnet"
@@ -138,7 +137,6 @@
             Value: !Ref Environment
           - Key: "Name"
             Value: "PrivateSubnet1"
-        MapPublicIpOnLaunch: true
 
     PrivateSubnet2:
       Type: "AWS::EC2::Subnet"
@@ -154,7 +152,6 @@
             Value: !Ref Environment
           - Key: "Name"
             Value: "PrivateSubnet2"
-        MapPublicIpOnLaunch: true
 
     PrivateSubnet3:
       Type: "AWS::EC2::Subnet"
@@ -170,7 +167,6 @@
             Value: !Ref Environment
           - Key: "Name"
             Value: "PrivateSubnet3"
-        MapPublicIpOnLaunch: true
 
     InternetGateway:
       Type: "AWS::EC2::InternetGateway"
