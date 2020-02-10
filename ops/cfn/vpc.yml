@@ -1,6 +1,6 @@
 # Creates custom VPC across 2 AZs, 2 public and 4 private subnets, 2 NAT Gateways.
 #
-# Add variables at first:
+# Add variables:
 # VPCName="RunpleVPC"
 # Region="us-east-1" or any from Mappings:AZRegions
 # Environment="Dev" or "Prod"
