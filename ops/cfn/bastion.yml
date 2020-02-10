@@ -9,6 +9,7 @@
 #
 # To create/update stack use:
 # aws cloudformation deploy --stack-name bastion --template-file ops/cfn/bastion.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM
+#
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name bastion
 ---
@@ -39,19 +40,24 @@
     Environment:
       Type: String
       Description: Dev or Prod
+    BastionHostAmiId:
+      Description: |
+        SSM Public Parameter (https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-public-parameters.html)
+      Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+      Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
 
-  Mappings:
-    RegionMap:
-      us-east-1:
-        AMI: ami-062f7200baf2fa504 # Amazon Linux 2 (64-bit x86)
-      us-east-2:
-        AMI: ami-02ccb28830b645a41 # Amazon Linux 2 (64-bit x86)
-      us-west-1:
-        AMI: ami-03caa3f860895f82e # Amazon Linux 2 (64-bit x86)
-      us-west-2:
-        AMI: ami-04590e7389a6e577c # Amazon Linux 2 (64-bit x86)
-      ca-central-1:
-        AMI: ami-0a269ca7cc3e3beff # Amazon Linux 2 (64-bit x86)
+  # Mappings:
+  #   RegionMap:
+  #     us-east-1:
+  #       AMI: ami-062f7200baf2fa504 # Amazon Linux 2 (64-bit x86)
+  #     us-east-2:
+  #       AMI: ami-02ccb28830b645a41 # Amazon Linux 2 (64-bit x86)
+  #     us-west-1:
+  #       AMI: ami-03caa3f860895f82e # Amazon Linux 2 (64-bit x86)
+  #     us-west-2:
+  #       AMI: ami-04590e7389a6e577c # Amazon Linux 2 (64-bit x86)
+  #     ca-central-1:
+  #       AMI: ami-0a269ca7cc3e3beff # Amazon Linux 2 (64-bit x86)
 
   Resources:
     BastionSecurityGroup:
@@ -131,31 +137,30 @@
       Type: AWS::AutoScaling::LaunchConfiguration
       Properties:
         UserData:
-          Fn::Base64: !Sub
-            - |
-              #!/bin/bash -x
-              echo -------------------------START-----------------------------
-              instanceID=$(curl -s \
-              http://169.254.169.254/latest/meta-data/instance-id)
-              allocationID=${AllocationId}
-              region=${Region}
-              function retryCommand() {
-                  local ATTEMPTS="$1"
-                  local SLEEP="$2"
-                  local FUNCTION="$3"
-                  for i in $(seq 1 $ATTEMPTS); do
-                      [ $i == 1 ] || sleep $SLEEP
-                      eval $FUNCTION && break
-                  done
-              }
-              hostnamectl set-hostname bastion
-              echo ---------------------ASSOCIATING EIP-----------------------
-              retryCommand 5 10 "aws ec2 associate-address --instance-id \
-              $instanceID --allocation-id $allocationID --region $region"
-            - AllocationId: !GetAtt BastionEIP.AllocationId
-              Region: !Ref 'AWS::Region'
+          Fn::Base64: !Sub |
+            #!/bin/bash -x
+            echo -------------------------START-----------------------------
+            instanceID=$(curl -s \
+            http://169.254.169.254/latest/meta-data/instance-id)
+            function retryCommand() {
+                local ATTEMPTS="$1"
+                local SLEEP="$2"
+                local FUNCTION="$3"
+                for i in $(seq 1 $ATTEMPTS); do
+                    [ $i == 1 ] || sleep $SLEEP
+                    eval $FUNCTION && break
+                done
+            }
+            hostnamectl set-hostname bastion
+            echo ---------------------ASSOCIATING EIP-----------------------
+            retryCommand 5 10 "aws ec2 associate-address \
+              --instance-id $instanceID \
+              --allocation-id ${BastionEIP.AllocationId} \
+              --region ${AWS::Region}"
+            echo -------------------------FINISH----------------------------
         AssociatePublicIpAddress: true
-        ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+        # ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+        ImageId: !Ref BastionHostAmiId
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
         IamInstanceProfile: !Ref BastionInstanceProfile
