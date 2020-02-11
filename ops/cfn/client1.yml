@@ -44,6 +44,10 @@
       Type: String
       Description: Project hosted zone name.
 
+    DBPassword:
+      Type: String
+      Description: User password for MYSQL
+
   Mappings:
     RegionMap:
       us-east-1:
@@ -141,10 +145,24 @@
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash -x
+            function retryCommand() {
+                local ATTEMPTS="$1"
+                local SLEEP="$2"
+                local FUNCTION="$3"
+                for i in $(seq 1 $ATTEMPTS); do
+                    [ $i == 1 ] || sleep $SLEEP
+                    eval $FUNCTION && break
+                done
+            }
             echo -------------------------START-----------------------------
             hostnamectl set-hostname webserver
             apt update
-            apt install openjdk-8-jdk awscli mysql-server -y
+            retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-server -y"
+            aws s3 cp "s3://client1-backend-xwiggy/xwiggy-0.0.1-SNAPSHOT.jar" .
+            aws s3 cp "s3://client1-backend-xwiggy/ddl.sql" .
+            mysql -u root < ddl.sql
+            mysql -u root -e "CREATE USER 'springuser'@'%' IDENTIFIED BY 'abcd1234';GRANT ALL PRIVILEGES ON *.* TO 'springuser'@'%';FLUSH PRIVILEGES;"
+            java -jar xwiggy-0.0.1-SNAPSHOT.jar
             echo -------------------------FINISH----------------------------
 
         AssociatePublicIpAddress: false
