@@ -143,7 +143,8 @@
             #!/bin/bash -x
             echo -------------------------START-----------------------------
             hostnamectl set-hostname webserver
-            apt install nginx -y
+            apt update
+            apt install openjdk-8-jdk -y
             echo -------------------------FINISH----------------------------
 
         AssociatePublicIpAddress: false
@@ -153,6 +154,7 @@
         KeyName: !Ref KeyName
         SecurityGroups:
           - !Ref client1SecurityGroup
+        AssociatePublicIpAddress: true
 
     # webAppAutoScalingPolicy:
     #   Type: AWS::AutoScaling::ScalingPolicy
