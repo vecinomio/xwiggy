@@ -44,10 +44,6 @@
       Type: String
       Description: Project hosted zone name.
 
-    DBPassword:
-      Type: String
-      Description: User password for MYSQL
-
   Mappings:
     RegionMap:
       us-east-1:
@@ -157,12 +153,9 @@
             echo -------------------------START-----------------------------
             hostnamectl set-hostname webserver
             apt update
-            retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-server -y"
+            retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-client -y"
             aws s3 cp "s3://client1-backend-xwiggy/xwiggy-0.0.2-SNAPSHOT.jar" .
             aws s3 cp "s3://client1-backend-xwiggy/ddl.sql" .
-            mysql -u root < ddl.sql
-            mysql -u root -e "CREATE USER 'springuser'@'%' IDENTIFIED BY 'abcd1234';GRANT ALL PRIVILEGES ON *.* TO 'springuser'@'%';FLUSH PRIVILEGES;"
-            java -jar xwiggy-0.0.2-SNAPSHOT.jar
             echo -------------------------FINISH----------------------------
 
         AssociatePublicIpAddress: false
@@ -223,6 +216,3 @@
         TTL: '300'
         ResourceRecords:
           - Fn::ImportValue: main-alb-DNSName
-
-Unknown column 'cart0_.quantity4' in 'field list'
-Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is org.springframework.dao.InvalidDataAccessResourceUsageException: could not extract ResultSet; SQL [n/a]; nested exception is org.hibernate.exception.SQLGrammarException: could not extract ResultSet] with root cause
