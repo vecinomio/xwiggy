@@ -153,9 +153,12 @@
             echo -------------------------START-----------------------------
             hostnamectl set-hostname webserver
             apt update
-            retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-client -y"
+            retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-server -y"
             aws s3 cp "s3://client1-backend-xwiggy/xwiggy-0.0.2-SNAPSHOT.jar" .
             aws s3 cp "s3://client1-backend-xwiggy/ddl.sql" .
+            mysql -u root < ddl.sql
+            mysql -u root -e "CREATE USER 'springuser'@'%' IDENTIFIED BY 'abcd1234';GRANT ALL PRIVILEGES ON *.* TO 'springuser'@'%';FLUSH PRIVILEGES;"
+            java -jar xwiggy-0.0.2-SNAPSHOT.jar
             echo -------------------------FINISH----------------------------
 
         AssociatePublicIpAddress: false
