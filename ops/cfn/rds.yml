@@ -1,0 +1,174 @@
+# Creates RDS in custom VPC.
+#
+# Add variables:
+# Region="us-east-1"
+# VPCName="RunpleVPC"
+# Environment="Dev" or "Prod"
+# DBUser="root"
+# DBPassword="abcd1234"
+#
+# To create/update stack use:
+# aws cloudformation deploy --stack-name rds --template-file ops/cfn/rds.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBUser=${DBUser} DBPassword=${DBPassword} --region ${Region}
+#
+# To delete stack use:
+# aws cloudformation delete-stack --stack-name rds --region ${Region}
+---
+  AWSTemplateFormatVersion: '2010-09-09'
+
+  Description: 'RDS in Private subnets within custom VPC.'
+
+  Parameters:
+
+    VPCStackName:
+      Type: String
+      Description: The name of the VPC stack.
+
+    Environment:
+      Type: String
+      Description: Dev or Prod
+
+    DBIdentifier:
+      Default: clientDB
+      Description: The database identifier
+      Type: String
+      MinLength: '1'
+      MaxLength: '64'
+      AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+      ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+    DBUser:
+      NoEcho: 'true'
+      Description: The database admin account username
+      Type: String
+      MinLength: '1'
+      MaxLength: '16'
+      AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+      ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+    DBPassword:
+      NoEcho: 'true'
+      Description: The database admin account password
+      Type: String
+      MinLength: '1'
+      MaxLength: '41'
+      AllowedPattern: '[a-zA-Z0-9]+'
+      ConstraintDescription: must contain only alphanumeric characters.
+    DBStorageSize:
+      Description: The size of the database (Gb)
+      Type: Number
+      Default: 20
+      MinValue: 20
+      MaxValue: 16384
+      ConstraintDescription: must be between 20 and 16384Gb.
+    MaxDBStorageSize:
+      Description: The upper limit to which Amazon RDS can automatically scale the storage of the DB instance.
+      Type: Number
+      Default: 100
+    DBInstanceClass:
+      Description: The database instance type
+      Type: String
+      Default: db.t2.micro
+      AllowedValues:
+        - db.t2.micro
+        - db.t2.small
+        - db.t2.medium
+        - db.t2.large
+        - db.t2.xlarge
+        - db.t2.2xlarge
+        - db.t3.micro
+        - db.t3.small
+        - db.t3.medium
+        - db.t3.large
+        - db.t3.xlarge
+        - db.t3.2xlarge
+      ConstraintDescription: must select a valid database instance type.
+    DBPort:
+      Description: TCP/IP port the database will use for application connections.
+      Type: Number
+      Default: 3306
+      ConstraintDescription: must be between 1024 and 65535.
+    MultiAZ:
+      Description: Multi-AZ master database
+      Type: String
+      Default: 'false'
+      AllowedValues:
+        - 'true'
+        - 'false'
+      ConstraintDescription: must be true or false.
+
+
+  Resources:
+
+    DBSubnetGroup:
+      Type: AWS::RDS::DBSubnetGroup
+      Properties:
+        DBSubnetGroupDescription: 'The subnet group for clients databases'
+        DBSubnetGroupName: 'clientsDbSubnetGroup'
+        SubnetIds:
+          - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet2"
+          - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet3"
+        Tags:
+          - Key: 'Name'
+            Value: 'ClientDBsSubnetGroup'
+          - Key: 'Environment'
+            Value: !Ref Environment
+
+    DBEC2SecurityGroup:
+      Type: 'AWS::EC2::SecurityGroup'
+      Properties:
+        GroupDescription: Open database for access
+        VpcId:
+          Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 3306
+            ToPort: 3306
+            CidrIp: 172.16.0.0/16
+            # SourceSecurityGroupId: !Ref WebServerSecurityGroup
+        Tags:
+          - Key: 'Name'
+            Value: !Sub "${DBIdentifier}SecurityGroup"
+          - Key: 'Environment'
+            Value: !Ref Environment
+
+
+    MasterDB:
+      Type: 'AWS::RDS::DBInstance'
+      Properties:
+        DBInstanceIdentifier: !Ref DBIdentifier
+        DBInstanceClass: !Ref DBInstanceClass
+        Engine: MySQL
+        EngineVersion: '5.7.22'
+        MasterUsername: !Ref DBUser
+        MasterUserPassword: !Ref DBPassword
+        StorageType: 'gp2'
+        AllocatedStorage: !Ref DBStorageSize
+        MaxAllocatedStorage: !Ref MaxDBStorageSize
+        MultiAZ: !Ref MultiAZ
+        AvailabilityZone: !Sub "${AWS::Region}a"
+        Port: !Ref DBPort
+        PubliclyAccessible: false
+        DBSubnetGroupName: !Ref DBSubnetGroup
+        VPCSecurityGroups:
+          - !Ref DBEC2SecurityGroup
+        BackupRetentionPeriod: 5
+        Tags:
+          - Key: Name
+            Value: !Sub "${DBIdentifier}Master"
+          - Key: 'Environment'
+            Value: !Ref Environment
+      DeletionPolicy: Snapshot
+
+    # ReplicaDB:
+    #   Type: 'AWS::RDS::DBInstance'
+    #   Properties:
+    #     SourceDBInstanceIdentifier: !Ref MasterDB
+    #     DBInstanceClass: !Ref DBInstanceClass
+    #     Tags:
+    #       - Key: Name
+    #         Value: Read Replica Database
+
+  Outputs:
+    DbEndpoint:
+      Description: "The Database endpoint address"
+      Value: !GetAtt MasterDB.Endpoint.Address
+      Export:
+        Name: !Sub "${AWS::StackName}-Endpoint"
