@@ -6,9 +6,11 @@
 # Environment="Dev" or "Prod"
 # KeyName="main-nvirginia"
 # HostedZoneName="miit.pp.ua"
+# S3Path="s3://client1-backend-xwiggy"
+# Application="xwiggy-0.0.2-SNAPSHOT.jar"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client1 --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
+# aws cloudformation deploy --stack-name client1 --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
 #
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name client1 --region ${Region}
@@ -44,10 +46,36 @@
       Type: String
       Description: Project hosted zone name.
 
+    S3Path:
+      Type: String
+      Description: The path to S3 client bucket.
+
+    Application:
+      Type: String
+      Description: The full name of the application archive.
+
   Mappings:
     RegionMap:
+      eu-central-1:
+        AMI: ami-0b418580298265d5c # Ubuntu 18.04
+      eu-west-1:
+        AMI: ami-035966e8adab4aaad # Ubuntu 18.04
+      eu-west-2:
+        AMI: ami-006a0174c6c25ac06 # Ubuntu 18.04
+      eu-west-3:
+        AMI: ami-096b8af6e7e8fb927 # Ubuntu 18.04
+      eu-north-1:
+        AMI: ami-0b7937aeb16a7eb94 # Ubuntu 18.04
       us-east-1:
         AMI: ami-07ebfd5b3428b6f4d # Ubuntu 18.04
+      us-east-2:
+        AMI: ami-0fc20dd1da406780b # Ubuntu 18.04
+      us-west-1:
+        AMI: ami-03ba3948f6c37a4b0 # Ubuntu 18.04
+      us-west-2:
+        AMI: ami-0d1cd67c26f5fca19 # Ubuntu 18.04
+      ca-central-1:
+        AMI: ami-0d0eaed20348a3389 # Ubuntu 18.04
 
   Resources:
     client1SecurityGroup:
@@ -139,8 +167,7 @@
       Type: "AWS::AutoScaling::LaunchConfiguration"
       Properties:
         UserData:
-          Fn::Base64: !Sub
-          - |
+          Fn::Base64: !Sub |
             #!/bin/bash -x
             function retryCommand() {
                 local ATTEMPTS="$1"
@@ -154,14 +181,11 @@
             echo -------------------------START-----------------------------
             hostnamectl set-hostname webserver
             apt update
-            retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-server -y"
-            aws s3 cp "s3://client1-backend-xwiggy/xwiggy-0.0.2-SNAPSHOT.jar" .
-            aws s3 cp "s3://client1-backend-xwiggy/ddl.sql" .
-            aws s3 cp "s3://client1-backend-xwiggy/application.properties" .
-            mysql -u root -h ${dbEndpoint} -p < ddl.sql
-            java -jar xwiggy-0.0.2-SNAPSHOT.jar --spring.config.location=application.propreties
+            retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-client -y"
+            aws s3 cp "${S3Path}/${Application}" .
+            aws s3 cp "${S3Path}/application.yml" .
+            java -jar ${Application} --spring.config.location=application.yml
             echo -------------------------FINISH----------------------------
-          - dbEndpoint: !ImportValue rds-Endpoint
         AssociatePublicIpAddress: false
         IamInstanceProfile: !Ref client1AppRoleProfile
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
