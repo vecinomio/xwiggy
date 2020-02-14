@@ -139,7 +139,8 @@
       Type: "AWS::AutoScaling::LaunchConfiguration"
       Properties:
         UserData:
-          Fn::Base64: !Sub |
+          Fn::Base64: !Sub
+          - |
             #!/bin/bash -x
             function retryCommand() {
                 local ATTEMPTS="$1"
@@ -156,11 +157,11 @@
             retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-server -y"
             aws s3 cp "s3://client1-backend-xwiggy/xwiggy-0.0.2-SNAPSHOT.jar" .
             aws s3 cp "s3://client1-backend-xwiggy/ddl.sql" .
-            mysql -u root < ddl.sql
-            mysql -u root -e "CREATE USER 'springuser'@'%' IDENTIFIED BY 'abcd1234';GRANT ALL PRIVILEGES ON *.* TO 'springuser'@'%';FLUSH PRIVILEGES;"
-            java -jar xwiggy-0.0.2-SNAPSHOT.jar
+            aws s3 cp "s3://client1-backend-xwiggy/application.properties" .
+            mysql -u root -h ${dbEndpoint} -p < ddl.sql
+            java -jar xwiggy-0.0.2-SNAPSHOT.jar --spring.config.location=application.propreties
             echo -------------------------FINISH----------------------------
-
+          - dbEndpoint: !ImportValue rds-Endpoint
         AssociatePublicIpAddress: false
         IamInstanceProfile: !Ref client1AppRoleProfile
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
