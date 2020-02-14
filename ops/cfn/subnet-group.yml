@@ -1,0 +1,51 @@
+# Creates Subnet Group for RDS.
+#
+# Add variables:
+# Region="us-east-1"
+# VPCName="RunpleVPC"
+# Environment="Dev" or "Prod"
+#
+# To create/update stack use:
+# aws cloudformation deploy --stack-name rds-subnet-group --template-file ops/cfn/subnet-group.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} --region ${Region}
+#
+# To delete stack use:
+# aws cloudformation delete-stack --stack-name rds-subnet-group --region ${Region}
+---
+  AWSTemplateFormatVersion: '2010-09-09'
+
+  Description: 'Subnet Group with private subnets for RDS.'
+
+  Parameters:
+
+    VPCStackName:
+      Type: String
+      Description: The name of the VPC stack.
+
+    Environment:
+      Type: String
+      Description: Dev or Pro
+
+
+  Resources:
+
+    DBSubnetGroup:
+      Type: AWS::RDS::DBSubnetGroup
+      Properties:
+        DBSubnetGroupDescription: 'The subnet group for clients databases'
+        DBSubnetGroupName: 'clientsDbSubnetGroup'
+        SubnetIds:
+          - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet2"
+          - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet3"
+        Tags:
+          - Key: 'Name'
+            Value: 'clientsDbSubnetGroup'
+          - Key: 'Environment'
+            Value: !Ref Environment
+
+
+  Outputs:
+    DbSubnetGroupName:
+      Description: "The name of the DB subnet Group"
+      Value: !Ref DBSubnetGroup
+      Export:
+        Name: !Sub "${AWS::StackName}-name"
