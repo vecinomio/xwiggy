@@ -45,7 +45,7 @@ export class ContactUsComponent implements OnInit {
     this.modelMessage.name=this.modelUser.firstname+this.modelUser.lastname;
     this.modelMessage.email=this.modelUser.email;
 
-    let url = "http://localhost:8080/contact";
+    let url = "http://127.0.0.1:8080/contact";
     this.http.post <contact>(url,this.modelMessage).subscribe(
       res => {
         ContactUsComponent.changeLoading();

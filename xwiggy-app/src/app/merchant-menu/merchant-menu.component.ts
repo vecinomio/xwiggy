@@ -48,7 +48,7 @@ export class MerchantMenuComponent implements OnInit {
   }
 
   getTotal():void{
-    let url = "http://localhost:8080/addToCart";
+    let url = "http://127.0.0.1:8080/addToCart";
     this.modalCart.quantity1=this.values[0].quantity;
     this.modalCart.quantity2=this.values[1].quantity;
     this.modalCart.quantity3=this.values[2].quantity;
@@ -63,4 +63,3 @@ export class MerchantMenuComponent implements OnInit {
 
   }
 }
-

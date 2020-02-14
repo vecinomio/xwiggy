@@ -36,11 +36,11 @@ export class AddItemComponent implements OnInit {
     if(formData.get('file')==null || formData.get('file')==undefined)
     {
       console.log(formData.get('file'));
-      this.url="http://localhost:8080/addNewItem";
+      this.url="http://127.0.0.1:8080/addNewItem";
     }
     else
     {
-      this.url="http://localhost:8080/addNewItemUrl";
+      this.url="http://127.0.0.1:8080/addNewItemUrl";
     }
     this.http.post(this.url, formData)
       .subscribe(
@@ -63,7 +63,7 @@ export class AddItemComponent implements OnInit {
   present:boolean=null;
 
   checkAvailability() {
-    this.http.post<boolean>("http://localhost:8080/checkItemId",this.newFoodItems.id).subscribe(
+    this.http.post<boolean>("http://127.0.0.1:8080/checkItemId",this.newFoodItems.id).subscribe(
       res=>{
         this.present=res;
       },err=>{

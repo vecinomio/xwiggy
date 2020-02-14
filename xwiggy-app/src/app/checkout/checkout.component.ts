@@ -63,7 +63,7 @@ export class CheckoutComponent implements OnInit {
 
   changeDB():void{
     if(this.cardNumberVal&&this.monthVal&&this.yearVal&&this.cvvVal&&this.nameOnCardVal) {
-      let url = "http://localhost:8080/changeDB";
+      let url = "http://127.0.0.1:8080/changeDB";
       this.http.get(url).subscribe(
         res => {
           console.log("DB Updated");
