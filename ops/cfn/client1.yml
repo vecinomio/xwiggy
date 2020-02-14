@@ -7,17 +7,18 @@
 # KeyName="main-nvirginia"
 # HostedZoneName="miit.pp.ua"
 # S3Path="s3://client1-backend-xwiggy"
-# Application="xwiggy-0.0.2-SNAPSHOT.jar"
+# Application="xwiggy-0.0.3-SNAPSHOT.jar"
+# ClientId="2"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client1 --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId} --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
 #
 # To delete stack use:
-# aws cloudformation delete-stack --stack-name client1 --region ${Region}
+# aws cloudformation delete-stack --stack-name client${ClientId} --region ${Region}
 ---
   AWSTemplateFormatVersion: '2010-09-09'
 
-  Description: "ASG with client web-servers in Private subnets"
+  Description: 'ASG with client web-servers in Private subnets'
 
   Parameters:
 
@@ -36,10 +37,10 @@
       AllowedValues: [ t2.micro, t2.small, t2.medium, t3.micro, t3.small, t3.medium ]
       ConstraintDescription: Must be a valid EC2 instance type.
 
-    client1ASGCapacity:
+    ASGCapacity:
       Description: The number of ec2 instances will be runned into ASG
       Type: String
-      Default: "1"
+      Default: '1'
       ConstraintDescription: Must be positive integer or zero
 
     HostedZoneName:
@@ -53,6 +54,7 @@
     Application:
       Type: String
       Description: The full name of the application archive.
+
 
   Mappings:
     RegionMap:
@@ -78,12 +80,12 @@
         AMI: ami-0d0eaed20348a3389 # Ubuntu 18.04
 
   Resources:
-    client1SecurityGroup:
+    clientSecurityGroup:
       Type: 'AWS::EC2::SecurityGroup'
       Properties:
         GroupDescription: Enable HTTP, HTTPS, SSH access
         VpcId:
-          Fn::ImportValue: !Sub "${VPCStackName}-VPCId"
+          Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
         SecurityGroupIngress:
           - IpProtocol: tcp
             FromPort: 22
@@ -94,21 +96,23 @@
             ToPort: 8080
             CidrIp: 0.0.0.0/0
         Tags:
-          - Key: "Name"
-            Value: !Sub "${AWS::StackName}-SG"
+          - Key: 'Name'
+            Value: !Sub '${AWS::StackName}-SG'
+          - Key: 'Environment'
+            Value: !Ref Environment
 
-    client1AppRoleProfile:
+    clientAppRoleProfile:
       Type: AWS::IAM::InstanceProfile
       Properties:
-        InstanceProfileName: !Sub "${AWS::StackName}-Profile"
-        Path: "/"
+        InstanceProfileName: !Sub '${AWS::StackName}-Profile'
+        Path: '/'
         Roles:
-          - !Ref client1AppRole
+          - !Ref clientAppRole
 
-    client1AppRole:
+    clientAppRole:
       Type: AWS::IAM::Role
       Properties:
-        Path: "/"
+        Path: '/'
         AssumeRolePolicyDocument:
           Statement:
             - Effect: Allow
@@ -118,15 +122,15 @@
               Action:
                 - sts:AssumeRole
         Policies:
-          - PolicyName: !Sub "${AWS::StackName}-Policy"
+          - PolicyName: !Sub '${AWS::StackName}-Policy'
             PolicyDocument:
               Statement:
                 - Effect: Allow
-                  Resource: "*"
+                  Resource: '*'
                   Action:
                     - s3:GetObject
 
-    client1TargetGroup:
+    clientTargetGroup:
       Type: AWS::ElasticLoadBalancingV2::TargetGroup
       Properties:
         HealthCheckIntervalSeconds: 10
@@ -137,7 +141,7 @@
         UnhealthyThresholdCount: 2
         Matcher:
           HttpCode: '200-299'
-        Name: client1-tg
+        Name: !Sub '${AWS::StackName}-TG'
         Port: 8080
         Protocol: HTTP
         TargetType: instance
@@ -145,26 +149,26 @@
           Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
         Tags:
         - Key: 'Name'
-          Value: 'client1-tg'
+          Value: !Sub '${AWS::StackName}-TG'
         - Key: 'Port'
           Value: 8080
 
-    client1ListenerRule:
+    clientListenerRule:
       Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
       Properties:
         Actions:
           - Type: forward
-            TargetGroupArn: !Ref client1TargetGroup
+            TargetGroupArn: !Ref clientTargetGroup
         Conditions:
           - Field: host-header
             HostHeaderConfig:
               Values:
-                - !Sub 'client1.${HostedZoneName}'
+                - !Sub '${AWS::StackName}.${HostedZoneName}'
         ListenerArn: !ImportValue main-alb-HttpsListener-ARN
         Priority: 2
 
-    LaunchConfig:
-      Type: "AWS::AutoScaling::LaunchConfiguration"
+    clientLaunchConfig:
+      Type: 'AWS::AutoScaling::LaunchConfiguration'
       Properties:
         UserData:
           Fn::Base64: !Sub |
@@ -187,12 +191,12 @@
             java -jar ${Application} --spring.config.location=application.yml
             echo -------------------------FINISH----------------------------
         AssociatePublicIpAddress: false
-        IamInstanceProfile: !Ref client1AppRoleProfile
+        IamInstanceProfile: !Ref clientAppRoleProfile
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
         SecurityGroups:
-          - !Ref client1SecurityGroup
+          - !Ref clientSecurityGroup
         AssociatePublicIpAddress: true
 
     # webAppAutoScalingPolicy:
@@ -212,22 +216,25 @@
     client1AppASG:
       Type: AWS::AutoScaling::AutoScalingGroup
       Properties:
-        AutoScalingGroupName: client1AppASG
-        MinSize: "1"
-        MaxSize: "3"
-        DesiredCapacity: !Ref client1ASGCapacity
+        AutoScalingGroupName: !Sub '${AWS::StackName}-AppASG'
+        MinSize: '1'
+        MaxSize: '3'
+        DesiredCapacity: !Ref ASGCapacity
         TargetGroupARNs:
           - !Ref client1TargetGroup
         HealthCheckGracePeriod: 300
-        LaunchConfigurationName: !Ref LaunchConfig
+        LaunchConfigurationName: !Ref clientLaunchConfig
         VPCZoneIdentifier:
-          - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet0"
-            Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet1"
-            Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet2"
-            Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet3"
+          - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet0'
+            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet1'
+            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet2'
+            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet3'
         Tags:
-          - Key: "Name"
-            Value: !Sub "${AWS::StackName}-ASG"
+          - Key: 'Name'
+            Value: !Sub '${AWS::StackName}-ASG'
+            PropagateAtLaunch: true
+          - Key: 'Environment'
+            Value: !Ref Environment
             PropagateAtLaunch: true
       # CreationPolicy:
       #   ResourceSignal:
@@ -235,11 +242,11 @@
       #     Timeout: "PT20M"
 
 
-    client1RecordSet:
+    clientRecordSet:
       Type: AWS::Route53::RecordSet
       Properties:
         HostedZoneName: !Sub '${HostedZoneName}.'
-        Name: !Sub 'client1.${HostedZoneName}.'
+        Name: !Sub '${AWS::StackName}.${HostedZoneName}.'
         Type: CNAME
         TTL: '300'
         ResourceRecords:
