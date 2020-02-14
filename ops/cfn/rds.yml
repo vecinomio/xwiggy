@@ -6,9 +6,10 @@
 # Environment="Dev" or "Prod"
 # DBUser="root"
 # DBPassword="abcd1234"
+# DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name rds --template-file ops/cfn/rds.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBUser=${DBUser} DBPassword=${DBPassword} --region ${Region}
+# aws cloudformation deploy --stack-name rds --template-file ops/cfn/rds.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBUser=${DBUser} DBPassword=${DBPassword} DBSnapshotARN=${DBSnapshotARN} --region ${Region}
 #
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name rds --region ${Region}
@@ -28,13 +29,14 @@
       Description: Dev or Prod
 
     DBIdentifier:
-      Default: clientDB
+      Default: clientdb1
       Description: The database identifier
       Type: String
       MinLength: '1'
       MaxLength: '64'
       AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
       ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+
     DBUser:
       NoEcho: 'true'
       Description: The database admin account username
@@ -43,6 +45,7 @@
       MaxLength: '16'
       AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
       ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+
     DBPassword:
       NoEcho: 'true'
       Description: The database admin account password
@@ -51,6 +54,7 @@
       MaxLength: '41'
       AllowedPattern: '[a-zA-Z0-9]+'
       ConstraintDescription: must contain only alphanumeric characters.
+
     DBStorageSize:
       Description: The size of the database (Gb)
       Type: Number
@@ -58,10 +62,12 @@
       MinValue: 20
       MaxValue: 16384
       ConstraintDescription: must be between 20 and 16384Gb.
+
     MaxDBStorageSize:
       Description: The upper limit to which Amazon RDS can automatically scale the storage of the DB instance.
       Type: Number
       Default: 100
+
     DBInstanceClass:
       Description: The database instance type
       Type: String
@@ -80,11 +86,13 @@
         - db.t3.xlarge
         - db.t3.2xlarge
       ConstraintDescription: must select a valid database instance type.
+
     DBPort:
       Description: TCP/IP port the database will use for application connections.
       Type: Number
       Default: 3306
       ConstraintDescription: must be between 1024 and 65535.
+
     MultiAZ:
       Description: Multi-AZ master database
       Type: String
@@ -93,6 +101,11 @@
         - 'true'
         - 'false'
       ConstraintDescription: must be true or false.
+
+    DBSnapshotARN:
+      Description: The ARN of the base DBinstance snapshot.
+      Type: String
+      ConstraintDescription: must be a valid database snapshot.
 
 
   Resources:
@@ -142,6 +155,7 @@
         StorageType: 'gp2'
         AllocatedStorage: !Ref DBStorageSize
         MaxAllocatedStorage: !Ref MaxDBStorageSize
+        DBSnapshotIdentifier: !Ref DBSnapshotARN
         MultiAZ: !Ref MultiAZ
         AvailabilityZone: !Sub "${AWS::Region}a"
         Port: !Ref DBPort
@@ -150,6 +164,7 @@
         VPCSecurityGroups:
           - !Ref DBEC2SecurityGroup
         BackupRetentionPeriod: 5
+        CopyTagsToSnapshot: true
         Tags:
           - Key: Name
             Value: !Sub "${DBIdentifier}Master"
