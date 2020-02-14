@@ -4,15 +4,15 @@
 # Region="us-east-1"
 # VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
+# ClientId="0"
 # DBUser="root"
 # DBPassword="abcd1234"
-# DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name rds --template-file ops/cfn/rds.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBUser=${DBUser} DBPassword=${DBPassword} DBSnapshotARN=${DBSnapshotARN} --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-rds --template-file ops/cfn/rds.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBIdentifier=client${ClientId}db DBUser=${DBUser} DBPassword=${DBPassword} --region ${Region}
 #
 # To delete stack use:
-# aws cloudformation delete-stack --stack-name rds --region ${Region}
+# aws cloudformation delete-stack --stack-name client${ClientId}-rds --region ${Region}
 ---
   AWSTemplateFormatVersion: '2010-09-09'
 
@@ -29,7 +29,6 @@
       Description: Dev or Prod
 
     DBIdentifier:
-      Default: clientdb1
       Description: The database identifier
       Type: String
       MinLength: '1'
@@ -67,6 +66,7 @@
       Description: The upper limit to which Amazon RDS can automatically scale the storage of the DB instance.
       Type: Number
       Default: 100
+      ConstraintDescription: must be between 20 and 16384Gb.
 
     DBInstanceClass:
       Description: The database instance type
@@ -120,7 +120,7 @@
           - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet3"
         Tags:
           - Key: 'Name'
-            Value: 'ClientDBsSubnetGroup'
+            Value: 'clientsDbSubnetGroup'
           - Key: 'Environment'
             Value: !Ref Environment
 
@@ -138,7 +138,7 @@
             # SourceSecurityGroupId: !Ref WebServerSecurityGroup
         Tags:
           - Key: 'Name'
-            Value: !Sub "${DBIdentifier}SecurityGroup"
+            Value: !Sub '${AWS::StackName}-SecurityGroup'
           - Key: 'Environment'
             Value: !Ref Environment
 
@@ -167,7 +167,7 @@
         CopyTagsToSnapshot: true
         Tags:
           - Key: Name
-            Value: !Sub "${DBIdentifier}Master"
+            Value: !Sub '${AWS::StackName}-Master'
           - Key: 'Environment'
             Value: !Ref Environment
       DeletionPolicy: Snapshot
