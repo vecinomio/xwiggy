@@ -275,7 +275,7 @@
             PredefinedMetricType: ALBRequestCountPerTarget
             ResourceLabel: !Sub
             - ${AlbArn}/${AlbTgArn}
-            - AlbArn: !Select [1, !Split [":loadbalancer/",  !ImportValue "main-ALB-ARN"]]
+            - AlbArn: !Select [1, !Split [":loadbalancer/",  !ImportValue "main-alb-ARN"]]
               AlbTgArn: !Select [5, !Split [":", !Ref clientTargetGroup]]
           TargetValue: 100.0
 
