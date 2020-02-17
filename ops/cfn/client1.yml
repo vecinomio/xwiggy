@@ -13,7 +13,7 @@
 # DbPassword="abcd1234"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client${ClientId}-asg --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} ClientId=${ClientId} S3Path=${S3Path} Application=${Application} DbUser=${DbUser} DbPassword${DbPassword} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-asg --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} ClientId=${ClientId} S3Path=${S3Path} Application=${Application} DbUser=${DbUser} DbPassword=${DbPassword} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
 #
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name client${ClientId}-asg --region ${Region}
@@ -186,7 +186,7 @@
               Values:
                 - !Sub 'client${ClientId}.${HostedZoneName}'
         ListenerArn: !ImportValue main-alb-HttpsListener-ARN
-        Priority: 2
+        Priority: !Ref ClientId
 
     clientLaunchConfig:
       Type: 'AWS::AutoScaling::LaunchConfiguration'
@@ -240,7 +240,7 @@
     # webAppAutoScalingPolicy:
     #   Type: AWS::AutoScaling::ScalingPolicy
     #   Properties:
-    #     AutoScalingGroupName: !Ref webAppASG
+    #     AutoScalingGroupName: !Ref clientAppASG
     #     PolicyType: TargetTrackingScaling
     #     TargetTrackingConfiguration:
     #       PredefinedMetricSpecification:
@@ -251,7 +251,7 @@
     #           albtgarn: !Select [5, !Split [":", !Ref WebTargetGroup]]
     #       TargetValue: 100.0
 
-    client1AppASG:
+    clientAppASG:
       Type: AWS::AutoScaling::AutoScalingGroup
       Properties:
         AutoScalingGroupName: !Sub '${AWS::StackName}-App'
