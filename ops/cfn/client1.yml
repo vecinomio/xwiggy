@@ -8,10 +8,12 @@
 # HostedZoneName="miit.pp.ua"
 # S3Path="s3://client1-backend-xwiggy"
 # Application="xwiggy-0.0.3-SNAPSHOT.jar"
-# ClientId="2"
+# ClientId="1"
+# DbUser="root"
+# DbPassword="abcd1234"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client${ClientId}-asg --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-asg --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} ClientId=${ClientId} S3Path=${S3Path} Application=${Application} DbUser=${DbUser} DbPassword${DbPassword} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
 #
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name client${ClientId}-asg --region ${Region}
@@ -51,6 +53,10 @@
       Type: String
       Description: Project hosted zone name.
 
+    ClientId:
+      Type: String
+      Description: The client Id.
+
     S3Path:
       Type: String
       Description: The path to S3 client bucket.
@@ -58,6 +64,16 @@
     Application:
       Type: String
       Description: The full name of the application archive.
+
+    DbUser:
+      Type: String
+      Description: The Database username
+      NoEcho: true
+
+    DbPassword:
+      Type: String
+      Description: The Database password
+      NoEcho: true
 
 
   Mappings:
@@ -84,6 +100,7 @@
         AMI: ami-0d0eaed20348a3389 # Ubuntu 18.04
 
   Resources:
+
     clientSecurityGroup:
       Type: 'AWS::EC2::SecurityGroup'
       Properties:
@@ -167,7 +184,7 @@
           - Field: host-header
             HostHeaderConfig:
               Values:
-                - !Sub '${AWS::StackName}.${HostedZoneName}'
+                - !Sub 'client${ClientId}.${HostedZoneName}'
         ListenerArn: !ImportValue main-alb-HttpsListener-ARN
         Priority: 2
 
@@ -176,40 +193,41 @@
       Properties:
         UserData:
           Fn::Base64: !Sub
-          - |
-            #!/bin/bash -x
-            function retryCommand() {
-                local ATTEMPTS="$1"
-                local SLEEP="$2"
-                local FUNCTION="$3"
-                for i in $(seq 1 $ATTEMPTS); do
-                    [ $i == 1 ] || sleep $SLEEP
-                    eval $FUNCTION && break
-                done
-            }
-            echo -------------------------START-----------------------------
-            hostnamectl set-hostname webserver
-            apt update
-            retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-client -y"
-            aws s3 cp "${S3Path}/${Application}" .
-            cat << EOF > application.yml
-              spring:
-                datasource:
-                  url: jdbc:mysql://${dbendpoint}:3306/myusers
-                  username: root
-                  password: abcd1234
-                  driverClassName: com.mysql.cj.jdbc.Driver
+            - |
+              #!/bin/bash -x
+              function retryCommand() {
+                  local ATTEMPTS="$1"
+                  local SLEEP="$2"
+                  local FUNCTION="$3"
+                  for i in $(seq 1 $ATTEMPTS); do
+                      [ $i == 1 ] || sleep $SLEEP
+                      eval $FUNCTION && break
+                  done
+              }
+              echo -------------------------START-----------------------------
+              hostnamectl set-hostname webserver
+              apt update
+              retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-client -y"
+              aws s3 cp "${S3Path}/${Application}" .
+              cat << EOF > application.yml
+                spring:
+                  datasource:
+                    url: jdbc:mysql://${DbEndpoint}:3306/myusers
+                    username: ${DbUser}
+                    password: ${DbPassword}
+                    driverClassName: com.mysql.cj.jdbc.Driver
 
-                jpa:
-                  hibernate.ddl-auto: none
-                  properties:
-                    hibernate:
-                      dialect: org.hibernate.dialect.MySQL5Dialect
-              fileStorage: /assets
-            EOF
-            java -jar ${Application} --spring.config.location=application.yml
-            echo -------------------------FINISH----------------------------
-          - dbendpoint: !ImportValue client2db-rds-Endpoint'
+                  jpa:
+                    hibernate.ddl-auto: none
+                    properties:
+                      hibernate:
+                        dialect: org.hibernate.dialect.MySQL5Dialect
+                fileStorage: /assets
+              EOF
+              java -jar ${Application} --spring.config.location=application.yml
+              echo -------------------------FINISH----------------------------
+            - DbEndpoint:
+                Fn::ImportValue: !Sub 'client${ClientId}-rds-Endpoint'
         AssociatePublicIpAddress: false
         IamInstanceProfile: !Ref clientAppRoleProfile
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
@@ -236,7 +254,7 @@
     client1AppASG:
       Type: AWS::AutoScaling::AutoScalingGroup
       Properties:
-        AutoScalingGroupName: !Sub '${AWS::StackName}-AppASG'
+        AutoScalingGroupName: !Sub '${AWS::StackName}-App'
         MinSize: '1'
         MaxSize: '3'
         DesiredCapacity: !Ref ASGCapacity
@@ -251,7 +269,7 @@
             Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet3'
         Tags:
           - Key: 'Name'
-            Value: !Sub '${AWS::StackName}-ASG'
+            Value: !Sub '${AWS::StackName}-App'
             PropagateAtLaunch: true
           - Key: 'Environment'
             Value: !Ref Environment
@@ -266,7 +284,7 @@
       Type: AWS::Route53::RecordSet
       Properties:
         HostedZoneName: !Sub '${HostedZoneName}.'
-        Name: !Sub '${AWS::StackName}.${HostedZoneName}.'
+        Name: !Sub 'client${ClientId}.${HostedZoneName}.'
         Type: CNAME
         TTL: '300'
         ResourceRecords:
