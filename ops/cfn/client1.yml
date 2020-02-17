@@ -11,10 +11,10 @@
 # ClientId="2"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client${ClientId} --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-asg --template-file ops/cfn/client1.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
 #
 # To delete stack use:
-# aws cloudformation delete-stack --stack-name client${ClientId} --region ${Region}
+# aws cloudformation delete-stack --stack-name client${ClientId}-asg --region ${Region}
 ---
   AWSTemplateFormatVersion: '2010-09-09'
 
@@ -24,6 +24,10 @@
 
     VPCStackName:
       Type: String
+
+    Environment:
+      Type: String
+      Description: Dev or Prod
 
     KeyName:
       Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
@@ -97,7 +101,7 @@
             CidrIp: 0.0.0.0/0
         Tags:
           - Key: 'Name'
-            Value: !Sub '${AWS::StackName}-SG'
+            Value: !Sub '${AWS::StackName}-SecurityGroup'
           - Key: 'Environment'
             Value: !Ref Environment
 
@@ -171,7 +175,8 @@
       Type: 'AWS::AutoScaling::LaunchConfiguration'
       Properties:
         UserData:
-          Fn::Base64: !Sub |
+          Fn::Base64: !Sub
+          - |
             #!/bin/bash -x
             function retryCommand() {
                 local ATTEMPTS="$1"
@@ -187,9 +192,24 @@
             apt update
             retryCommand 5 10 "apt install openjdk-8-jdk awscli mysql-client -y"
             aws s3 cp "${S3Path}/${Application}" .
-            aws s3 cp "${S3Path}/application.yml" .
+            cat << EOF > application.yml
+              spring:
+                datasource:
+                  url: jdbc:mysql://${dbendpoint}:3306/myusers
+                  username: root
+                  password: abcd1234
+                  driverClassName: com.mysql.cj.jdbc.Driver
+
+                jpa:
+                  hibernate.ddl-auto: none
+                  properties:
+                    hibernate:
+                      dialect: org.hibernate.dialect.MySQL5Dialect
+              fileStorage: /assets
+            EOF
             java -jar ${Application} --spring.config.location=application.yml
             echo -------------------------FINISH----------------------------
+          - dbendpoint: !ImportValue client2db-rds-Endpoint'
         AssociatePublicIpAddress: false
         IamInstanceProfile: !Ref clientAppRoleProfile
         ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
@@ -221,7 +241,7 @@
         MaxSize: '3'
         DesiredCapacity: !Ref ASGCapacity
         TargetGroupARNs:
-          - !Ref client1TargetGroup
+          - !Ref clientTargetGroup
         HealthCheckGracePeriod: 300
         LaunchConfigurationName: !Ref clientLaunchConfig
         VPCZoneIdentifier:
