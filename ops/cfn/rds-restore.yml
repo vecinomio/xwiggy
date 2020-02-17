@@ -4,13 +4,13 @@
 # Region="us-east-1"
 # VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
-# ClientId="2"
+# ClientId="1"
 # DBUser="root"
 # DBPassword="abcd1234"
 # DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client${ClientId}-rds --template-file ops/cfn/rds-restore.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBIdentifier=client${ClientId}db DBUser=${DBUser} DBPassword=${DBPassword} DBSnapshotARN=${DBSnapshotARN} --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-rds --template-file ops/cfn/rds-restore.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBIdentifier=client${ClientId}db DBSnapshotARN=${DBSnapshotARN} --region ${Region}
 #
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name client${ClientId}-rds --region ${Region}
