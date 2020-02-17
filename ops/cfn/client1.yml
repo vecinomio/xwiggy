@@ -237,20 +237,6 @@
           - !Ref clientSecurityGroup
         AssociatePublicIpAddress: true
 
-    # webAppAutoScalingPolicy:
-    #   Type: AWS::AutoScaling::ScalingPolicy
-    #   Properties:
-    #     AutoScalingGroupName: !Ref clientAppASG
-    #     PolicyType: TargetTrackingScaling
-    #     TargetTrackingConfiguration:
-    #       PredefinedMetricSpecification:
-    #         PredefinedMetricType: ALBRequestCountPerTarget
-    #         ResourceLabel: !Sub
-    #         - ${albarn}/${albtgarn}
-    #         - albarn: !Select [1, !Split [":loadbalancer/",  !ImportValue "alb-ALB-ARN"]]
-    #           albtgarn: !Select [5, !Split [":", !Ref WebTargetGroup]]
-    #       TargetValue: 100.0
-
     clientAppASG:
       Type: AWS::AutoScaling::AutoScalingGroup
       Properties:
@@ -279,6 +265,19 @@
       #     Count: !Ref WebASGCapacity
       #     Timeout: "PT20M"
 
+    clientAutoScalingPolicy:
+      Type: AWS::AutoScaling::ScalingPolicy
+      Properties:
+        AutoScalingGroupName: !Ref clientAppASG
+        PolicyType: TargetTrackingScaling
+        TargetTrackingConfiguration:
+          PredefinedMetricSpecification:
+            PredefinedMetricType: ALBRequestCountPerTarget
+            ResourceLabel: !Sub
+            - ${AlbArn}/${AlbTgArn}
+            - AlbArn: !Select [1, !Split [":loadbalancer/",  !ImportValue "main-ALB-ARN"]]
+              AlbTgArn: !Select [5, !Split [":", !Ref clientTargetGroup]]
+          TargetValue: 100.0
 
     clientRecordSet:
       Type: AWS::Route53::RecordSet
