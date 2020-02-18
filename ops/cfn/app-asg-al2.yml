@@ -208,7 +208,7 @@
               EOF
               java -jar ${Application} --spring.config.location=application.yml &
               echo -------------------------FINISH----------------------------
-              retryCommand 5 10 'curl -sS http://localhost:8080 | grep "XwiggyApp"'
+              retryCommand 10 30 'curl -sS http://localhost:8080 | grep "XwiggyApp"'
               /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource clientAppASG --region ${AWS::Region}
             - DbEndpoint:
                 Fn::ImportValue: !Sub 'client${ClientId}-rds-Endpoint'
