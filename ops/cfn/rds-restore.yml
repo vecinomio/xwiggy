@@ -5,8 +5,6 @@
 # VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
 # ClientId="1"
-# DBUser="root"
-# DBPassword="abcd1234"
 # DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
 #
 # To create/update stack use:
@@ -36,24 +34,6 @@
       MaxLength: '64'
       AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
       ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
-
-    # DBUser:
-    #   NoEcho: 'true'
-    #   Description: The database admin account username
-    #   Type: String
-    #   MinLength: '1'
-    #   MaxLength: '16'
-    #   AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
-    #   ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
-
-    # DBPassword:
-    #   NoEcho: 'true'
-    #   Description: The database admin account password
-    #   Type: String
-    #   MinLength: '1'
-    #   MaxLength: '41'
-    #   AllowedPattern: '[a-zA-Z0-9]+'
-    #   ConstraintDescription: must contain only alphanumeric characters.
 
     DBStorageSize:
       Description: The size of the database (Gb)
@@ -111,20 +91,6 @@
 
   Resources:
 
-    # DBSubnetGroup:
-    #   Type: AWS::RDS::DBSubnetGroup
-    #   Properties:
-    #     DBSubnetGroupDescription: 'The subnet group for clients databases'
-    #     DBSubnetGroupName: 'clientsDbSubnetGroup'
-    #     SubnetIds:
-    #       - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet2"
-    #       - Fn::ImportValue: !Sub "${VPCStackName}-PrivateSubnet3"
-    #     Tags:
-    #       - Key: 'Name'
-    #         Value: 'clientsDbSubnetGroup'
-    #       - Key: 'Environment'
-    #         Value: !Ref Environment
-
     DBEC2SecurityGroup:
       Type: 'AWS::EC2::SecurityGroup'
       Properties:
@@ -151,8 +117,6 @@
         DBInstanceClass: !Ref DBInstanceClass
         Engine: MySQL
         EngineVersion: '5.7.22'
-        # MasterUsername: !Ref DBUser
-        # MasterUserPassword: !Ref DBPassword
         StorageType: 'gp2'
         AllocatedStorage: !Ref DBStorageSize
         MaxAllocatedStorage: !Ref MaxDBStorageSize
