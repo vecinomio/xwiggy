@@ -9,7 +9,7 @@
 # DBPassword="abcd1234"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client${ClientId}-rds --template-file ops/cfn/rds.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBIdentifier=client${ClientId}db DBUser=${DBUser} DBPassword=${DBPassword} --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-rds --template-file ops/cfn/rds.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} ClientId=${ClientId} DBIdentifier=client${ClientId}db DBUser=${DBUser} DBPassword=${DBPassword} --region ${Region}
 #
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name client${ClientId}-rds --region ${Region}
@@ -27,6 +27,10 @@
     Environment:
       Type: String
       Description: Dev or Prod
+
+    ClientId:
+      Type: String
+      Description: The client Id.
 
     DBIdentifier:
       Description: The database identifier
@@ -134,7 +138,8 @@
           - IpProtocol: tcp
             FromPort: 3306
             ToPort: 3306
-            SourceSecurityGroupId: !ImportValue 'webservers-sg-id'
+            SourceSecurityGroupId:
+              Fn::ImportValue: !Sub 'client${ClientId}-webservers-sg-id'
         Tags:
           - Key: 'Name'
             Value: !Sub '${AWS::StackName}-SecurityGroup'
