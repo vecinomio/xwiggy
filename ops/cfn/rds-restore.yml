@@ -8,7 +8,7 @@
 # DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client${ClientId}-rds --template-file ops/cfn/rds-restore.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} DBIdentifier=client${ClientId}db DBSnapshotARN=${DBSnapshotARN} --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-rds --template-file ops/cfn/rds-restore.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} ClientId=${ClientId} DBIdentifier=client${ClientId}db DBSnapshotARN=${DBSnapshotARN} --region ${Region}
 #
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name client${ClientId}-rds --region ${Region}
@@ -26,6 +26,10 @@
     Environment:
       Type: String
       Description: Dev or Prod
+
+    ClientId:
+      Type: String
+      Description: The client Id.
 
     DBIdentifier:
       Description: The database identifier
@@ -91,7 +95,7 @@
 
   Resources:
 
-    DBEC2SecurityGroup:
+    RDSAccessSecurityGroup:
       Type: 'AWS::EC2::SecurityGroup'
       Properties:
         GroupDescription: Open database for access
@@ -101,10 +105,11 @@
           - IpProtocol: tcp
             FromPort: 3306
             ToPort: 3306
-            SourceSecurityGroupId: !ImportValue 'webservers-sg-id'
+            SourceSecurityGroupId:
+              Fn::ImportValue: !Sub 'client${ClientId}-webservers-sg-id'
         Tags:
           - Key: 'Name'
-            Value: !Sub '${AWS::StackName}-SecurityGroup'
+            Value: !Sub '${AWS::StackName}-sg'
           - Key: 'Environment'
             Value: !Ref Environment
 
@@ -126,7 +131,7 @@
         PubliclyAccessible: false
         DBSubnetGroupName: !ImportValue 'rds-subnet-group-name'
         VPCSecurityGroups:
-          - !Ref DBEC2SecurityGroup
+          - !Ref RDSAccessSecurityGroup
         BackupRetentionPeriod: 5
         CopyTagsToSnapshot: true
         Tags:
