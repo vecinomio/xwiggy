@@ -3,7 +3,7 @@ import {AppComponent, User} from "../app.component";
 import {Router} from "@angular/router";
 
 @Component({
-  selector: 'app-welcom',
+  selector: 'app-welcome',
   templateUrl: './welcome.component.html',
   styleUrls: ['./welcome.component.css']
 })

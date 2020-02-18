@@ -45,7 +45,7 @@ export class LoginComponent implements OnInit {
       },
       err=>{
         console.log([this.model]);
-        alert("An error has occurred while logging in");
+        alert("An error has occurred while logging in. Can't redirect");
       }
     )
   }
