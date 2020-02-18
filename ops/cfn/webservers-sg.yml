@@ -4,12 +4,13 @@
 # Region="us-east-1"
 # VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
+# ClientId="1"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name webservers-sg --template-file ops/cfn/webservers-sg.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-webservers-sg --template-file ops/cfn/webservers-sg.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} --region ${Region}
 #
 # To delete stack use:
-# aws cloudformation delete-stack --stack-name webservers-sg --region ${Region}
+# aws cloudformation delete-stack --stack-name client${ClientId}-webservers-sg --region ${Region}
 ---
   AWSTemplateFormatVersion: '2010-09-09'
 
