@@ -1,0 +1,63 @@
+# Creates Security Group for application webservers.
+#
+# Add variables:
+# Region="us-east-1"
+# VPCName="RunpleVPC"
+# Environment="Dev" or "Prod"
+#
+# To create/update stack use:
+# aws cloudformation deploy --stack-name webservers-sg --template-file ops/cfn/webservers-sg.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} --region ${Region}
+#
+# To delete stack use:
+# aws cloudformation delete-stack --stack-name webservers-sg --region ${Region}
+---
+  AWSTemplateFormatVersion: '2010-09-09'
+
+  Description: 'Security Group for application webservers'
+
+  Parameters:
+
+    VPCStackName:
+      Type: String
+
+    Environment:
+      Type: String
+      Description: Dev or Prod
+
+  Resources:
+
+    WebserversSecurityGroup:
+      Type: 'AWS::EC2::SecurityGroup'
+      Properties:
+        GroupDescription: Enable SSH access from Bastion, 8080, icmp Echo Request
+        VpcId:
+          Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: 0.0.0.0/0
+            Description: SSH access from Bastion-host
+          - IpProtocol: tcp
+            FromPort: 8080
+            ToPort: 8080
+            CidrIp: 0.0.0.0/0
+            Description: access to webserver via port 8080
+          - IpProtocol: icmp
+            FromPort: '8'
+            ToPort: '-1'
+            CidrIp: 172.16.0.0/16
+            Description: icmp echo request
+        Tags:
+          - Key: 'Name'
+            Value: !Sub '${AWS::StackName}'
+          - Key: 'Environment'
+            Value: !Ref Environment
+
+  Outputs:
+    SecurityGroupId:
+      Description: 'An Id of the Webservers Security Group'
+      Value: !Ref WebserversSecurityGroup
+      Export:
+        Type: String
+        Name: !Sub '${AWS::StackName}-id'
