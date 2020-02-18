@@ -101,8 +101,7 @@
           - IpProtocol: tcp
             FromPort: 3306
             ToPort: 3306
-            CidrIp: 172.16.0.0/16
-            # SourceSecurityGroupId: !Ref WebServerSecurityGroup
+            SourceSecurityGroupId: !ImportValue 'webservers-sg-id'
         Tags:
           - Key: 'Name'
             Value: !Sub '${AWS::StackName}-SecurityGroup'
@@ -122,10 +121,10 @@
         MaxAllocatedStorage: !Ref MaxDBStorageSize
         DBSnapshotIdentifier: !Ref DBSnapshotARN
         MultiAZ: !Ref MultiAZ
-        AvailabilityZone: !Sub "${AWS::Region}a"
+        AvailabilityZone: !Sub '${AWS::Region}a'
         Port: !Ref DBPort
         PubliclyAccessible: false
-        DBSubnetGroupName: !ImportValue rds-subnet-group-name
+        DBSubnetGroupName: !ImportValue 'rds-subnet-group-name'
         VPCSecurityGroups:
           - !Ref DBEC2SecurityGroup
         BackupRetentionPeriod: 5
