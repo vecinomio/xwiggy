@@ -13,7 +13,7 @@
 # DbPassword="abcd1234"
 #
 # To create/update stack use:
-# aws cloudformation deploy --stack-name client${ClientId}-asg --template-file ops/cfn/app-asg-ubuntu.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} KeyName=${KeyName} HostedZoneName=${HostedZoneName} ClientId=${ClientId} S3Path=${S3Path} Application=${Application} DbUser=${DbUser} DbPassword=${DbPassword} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
+# aws cloudformation deploy --stack-name client${ClientId}-asg --template-file ops/cfn/app-asg-ubuntu.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} ClientId=${ClientId} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} DbUser=${DbUser} DbPassword=${DbPassword} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
 #
 # To delete stack use:
 # aws cloudformation delete-stack --stack-name client${ClientId}-asg --region ${Region}
@@ -30,6 +30,10 @@
     Environment:
       Type: String
       Description: Dev or Prod
+
+    ClientId:
+      Type: String
+      Description: The client Id.
 
     KeyName:
       Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
@@ -52,10 +56,6 @@
     HostedZoneName:
       Type: String
       Description: Project hosted zone name.
-
-    ClientId:
-      Type: String
-      Description: The client Id.
 
     S3Path:
       Type: String
@@ -213,7 +213,7 @@
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
         SecurityGroups:
-          - Fn::ImportValue: 'webservers-sg-id'
+          - Fn::ImportValue: !Sub 'client${ClientId}-webservers-sg-id'
         AssociatePublicIpAddress: true
 
     clientAppASG:
