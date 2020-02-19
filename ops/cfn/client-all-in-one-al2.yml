@@ -1,0 +1,393 @@
+# Creates:
+#    - client ASG with Amazon-Linux-2 web-servers in Private subnets;
+#    - MYSQL RDS instance for client Database in Private subnets.
+#
+# Add variables:
+# Region="us-east-1"
+# VPCName="RunpleVPC"
+# Environment="Dev" or "Prod"
+# DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
+# DBName="myusers"
+# DBUser="root"
+# DBPassword="abcd1234"
+# KeyName="main-nvirginia"
+# HostedZoneName="miit.pp.ua"
+# S3Path="s3://client1-backend-xwiggy"
+# Application="xwiggy-0.0.3-SNAPSHOT.jar"
+# ClientId="1"
+#
+# To create/update stack use:
+# aws cloudformation deploy --stack-name client${ClientId} --template-file ops/cfn/client-all-in-one-al2.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} ClientId=${ClientId} DBIdentifier=client${ClientId}db DBSnapshotARN=${DBSnapshotARN} DBName=${DBName} DBUser=${DBUser} DBPassword=${DBPassword} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
+#
+# To delete stack use:
+# aws cloudformation delete-stack --stack-name client${ClientId} --region ${Region}
+---
+  AWSTemplateFormatVersion: '2010-09-09'
+
+  Description: 'ASG with client web-servers and RDS instance in Private subnets'
+
+  Parameters:
+
+    VPCStackName:
+      Type: String
+
+    Environment:
+      Type: String
+      Description: Dev or Prod
+
+    ClientId:
+      Type: String
+      Description: The client Id.
+
+    DBIdentifier:
+      Description: The database identifier
+      Type: String
+      MinLength: '1'
+      MaxLength: '64'
+      AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+      ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+
+    DBName:
+      Description: The name of the Database.
+      Type: String
+
+    DBStorageSize:
+      Description: The size of the database (Gb)
+      Type: Number
+      Default: 20
+      MinValue: 20
+      MaxValue: 16384
+      ConstraintDescription: must be between 20 and 16384Gb.
+
+    MaxDBStorageSize:
+      Description: The upper limit to which Amazon RDS can automatically scale the storage of the DB instance.
+      Type: Number
+      Default: 100
+      ConstraintDescription: must be between 20 and 16384Gb.
+
+    DBInstanceClass:
+      Description: The database instance type
+      Type: String
+      Default: db.t2.micro
+      AllowedValues:
+        - db.t2.micro
+        - db.t2.small
+        - db.t2.medium
+        - db.t2.large
+        - db.t2.xlarge
+        - db.t2.2xlarge
+        - db.t3.micro
+        - db.t3.small
+        - db.t3.medium
+        - db.t3.large
+        - db.t3.xlarge
+        - db.t3.2xlarge
+      ConstraintDescription: must select a valid database instance type.
+
+    DBPort:
+      Description: TCP/IP port the database will use for application connections.
+      Type: Number
+      Default: 3306
+      ConstraintDescription: must be between 1024 and 65535.
+
+    MultiAZ:
+      Description: Multi-AZ master database
+      Type: String
+      Default: 'false'
+      AllowedValues:
+        - 'true'
+        - 'false'
+      ConstraintDescription: must be true or false.
+
+    DBSnapshotARN:
+      Description: The ARN of the base DBinstance snapshot.
+      Type: String
+      ConstraintDescription: must be a valid database snapshot.
+
+    KeyName:
+      Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+      Type: 'AWS::EC2::KeyPair::KeyName'
+      ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+    InstanceType:
+      Type: String
+      Description: Type of EC2 instance.
+      Default: t2.micro
+      AllowedValues: [ t2.micro, t2.small, t2.medium, t3.micro, t3.small, t3.medium ]
+      ConstraintDescription: Must be a valid EC2 instance type.
+
+    ASGCapacity:
+      Description: The number of ec2 instances will be runned into ASG
+      Type: String
+      Default: '1'
+      ConstraintDescription: Must be positive integer or zero
+
+    HostedZoneName:
+      Type: String
+      Description: Project hosted zone name.
+
+    S3Path:
+      Type: String
+      Description: The path to S3 client bucket.
+
+    Application:
+      Type: String
+      Description: The full name of the application archive.
+
+    DBUser:
+      Type: String
+      Description: The Database username
+      NoEcho: true
+
+    DBPassword:
+      Type: String
+      Description: The Database password
+      NoEcho: true
+
+    clientAmiId:
+      Description: |
+        SSM Public Parameter (https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-public-parameters.html)
+      Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+      Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+  Resources:
+
+    WebserversSecurityGroup:
+      Type: 'AWS::EC2::SecurityGroup'
+      Properties:
+        GroupDescription: Enable SSH access from Bastion, 8080, icmp Echo Request
+        VpcId:
+          Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: 0.0.0.0/0
+            Description: SSH access from Bastion-host
+          - IpProtocol: tcp
+            FromPort: 8080
+            ToPort: 8080
+            CidrIp: 0.0.0.0/0
+            Description: access to webserver via port 8080
+          - IpProtocol: icmp
+            FromPort: '8'
+            ToPort: '-1'
+            CidrIp: 172.16.0.0/16
+            Description: icmp echo request
+        Tags:
+          - Key: 'Name'
+            Value: 'webserver-access-sg'
+          - Key: 'Environment'
+            Value: !Ref Environment
+
+    RDSAccessSecurityGroup:
+      Type: 'AWS::EC2::SecurityGroup'
+      Properties:
+        GroupDescription: Open database for access
+        VpcId:
+          Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 3306
+            ToPort: 3306
+            SourceSecurityGroupId: !Ref WebserversSecurityGroup
+        Tags:
+          - Key: 'Name'
+            Value: 'RDS-access-sg'
+          - Key: 'Environment'
+            Value: !Ref Environment
+
+    MasterDB:
+      Type: 'AWS::RDS::DBInstance'
+      Properties:
+        DBInstanceIdentifier: !Ref DBIdentifier
+        DBInstanceClass: !Ref DBInstanceClass
+        Engine: MySQL
+        EngineVersion: '5.7.22'
+        StorageType: 'gp2'
+        AllocatedStorage: !Ref DBStorageSize
+        MaxAllocatedStorage: !Ref MaxDBStorageSize
+        DBSnapshotIdentifier: !Ref DBSnapshotARN
+        MultiAZ: !Ref MultiAZ
+        AvailabilityZone: !Sub '${AWS::Region}a'
+        Port: !Ref DBPort
+        PubliclyAccessible: false
+        DBSubnetGroupName: !ImportValue 'rds-subnet-group-name'
+        VPCSecurityGroups:
+          - !Ref RDSAccessSecurityGroup
+        BackupRetentionPeriod: 5
+        CopyTagsToSnapshot: true
+        Tags:
+          - Key: Name
+            Value: !Sub '${AWS::StackName}-Master-RDS'
+          - Key: 'Environment'
+            Value: !Ref Environment
+      DeletionPolicy: Snapshot
+
+    clientAppRoleProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        InstanceProfileName: !Sub '${AWS::StackName}-Profile'
+        Path: '/'
+        Roles:
+          - !Ref clientAppRole
+
+    clientAppRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: '/'
+        AssumeRolePolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ec2.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: !Sub '${AWS::StackName}-Policy'
+            PolicyDocument:
+              Statement:
+                - Effect: Allow
+                  Resource: '*'
+                  Action:
+                    - s3:GetObject
+
+    clientTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        HealthCheckIntervalSeconds: 10
+        HealthCheckPath: '/'
+        HealthCheckProtocol: HTTP
+        HealthCheckTimeoutSeconds: 5
+        HealthyThresholdCount: 2
+        UnhealthyThresholdCount: 2
+        Matcher:
+          HttpCode: '200-299'
+        Name: !Sub '${AWS::StackName}-TG'
+        Port: 8080
+        Protocol: HTTP
+        TargetType: instance
+        VpcId:
+          Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
+        Tags:
+        - Key: 'Name'
+          Value: !Sub '${AWS::StackName}-TG'
+        - Key: 'Port'
+          Value: 8080
+
+    clientListenerRule:
+      Type: 'AWS::ElasticLoadBalancingV2::ListenerRule'
+      Properties:
+        Actions:
+          - Type: forward
+            TargetGroupArn: !Ref clientTargetGroup
+        Conditions:
+          - Field: host-header
+            HostHeaderConfig:
+              Values:
+                - !Sub 'client${ClientId}.${HostedZoneName}'
+        ListenerArn: !ImportValue main-alb-HttpsListener-ARN
+        Priority: !Ref ClientId
+
+    clientLaunchConfig:
+      Type: 'AWS::AutoScaling::LaunchConfiguration'
+      Properties:
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash -x
+              function retryCommand() {
+                  local ATTEMPTS="$1"
+                  local SLEEP="$2"
+                  local FUNCTION="$3"
+                  for i in $(seq 1 $ATTEMPTS); do
+                      [ $i == 1 ] || sleep $SLEEP
+                      eval $FUNCTION && break
+                  done
+              }
+              echo -------------------------START-----------------------------
+              hostnamectl set-hostname webserver
+              yum update
+              retryCommand 5 10 "yum install java-1.8.0-openjdk mysql -y"
+              aws s3 cp "${S3Path}/${Application}" .
+              cat << EOF > application.yml
+                spring:
+                  datasource:
+                    url: jdbc:mysql://${DBEndpoint}:${DBPort}/${DBName}
+                    username: ${DBUser}
+                    password: ${DBPassword}
+                    driverClassName: com.mysql.cj.jdbc.Driver
+
+                  jpa:
+                    hibernate.ddl-auto: none
+                    properties:
+                      hibernate:
+                        dialect: org.hibernate.dialect.MySQL5Dialect
+                fileStorage: /assets
+              EOF
+              java -jar ${Application} --spring.config.location=application.yml &
+              echo -------------------------FINISH----------------------------
+              retryCommand 10 30 'curl -sS http://localhost:8080 | grep "XwiggyApp"'
+              /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource clientAppASG --region ${AWS::Region}
+            - DBEndpoint: !GetAtt MasterDB.Endpoint.Address
+        AssociatePublicIpAddress: false
+        IamInstanceProfile: !Ref clientAppRoleProfile
+        ImageId: !Ref clientAmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroups:
+          - !Ref WebserversSecurityGroup
+        AssociatePublicIpAddress: true
+
+    clientAppASG:
+      Type: AWS::AutoScaling::AutoScalingGroup
+      Properties:
+        AutoScalingGroupName: !Sub '${AWS::StackName}-AppASG'
+        MinSize: '1'
+        MaxSize: '3'
+        DesiredCapacity: !Ref ASGCapacity
+        TargetGroupARNs:
+          - !Ref clientTargetGroup
+        HealthCheckGracePeriod: 300
+        LaunchConfigurationName: !Ref clientLaunchConfig
+        VPCZoneIdentifier:
+          - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet0'
+            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet1'
+            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet2'
+            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet3'
+        Tags:
+          - Key: 'Name'
+            Value: !Sub '${AWS::StackName}-AppASG'
+            PropagateAtLaunch: true
+          - Key: 'Environment'
+            Value: !Ref Environment
+            PropagateAtLaunch: true
+      CreationPolicy:
+        ResourceSignal:
+          Count: !Ref ASGCapacity
+          Timeout: "PT15M"
+
+    clientAutoScalingPolicy:
+      Type: AWS::AutoScaling::ScalingPolicy
+      Properties:
+        AutoScalingGroupName: !Ref clientAppASG
+        PolicyType: TargetTrackingScaling
+        TargetTrackingConfiguration:
+          PredefinedMetricSpecification:
+            PredefinedMetricType: ALBRequestCountPerTarget
+            ResourceLabel: !Sub
+            - ${AlbArn}/${AlbTgArn}
+            - AlbArn: !Select [1, !Split [":loadbalancer/",  !ImportValue "main-alb-ARN"]]
+              AlbTgArn: !Select [5, !Split [":", !Ref clientTargetGroup]]
+          TargetValue: 100.0
+
+    clientRecordSet:
+      Type: AWS::Route53::RecordSet
+      Properties:
+        HostedZoneName: !Sub '${HostedZoneName}.'
+        Name: !Sub 'client${ClientId}.${HostedZoneName}.'
+        Type: CNAME
+        TTL: '300'
+        ResourceRecords:
+          - Fn::ImportValue: main-alb-DNSName
