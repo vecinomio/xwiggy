@@ -7,13 +7,13 @@
 # VPCName="RunpleVPC"
 # Environment="Dev" or "Prod"
 # DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
-# DBName="myusers"
-# DBUser="root"
+# DBName="onlinebanking"
+# DBUser="springuser"
 # DBPassword="abcd1234"
 # KeyName="main-nvirginia"
 # HostedZoneName="miit.pp.ua"
-# S3Path="s3://client1-backend-xwiggy"
-# Application="xwiggy-0.0.3-SNAPSHOT.jar"
+# S3Path="s3://online-banking"
+# Application="online-banking-0.0.1-SNAPSHOT.jar"
 # ClientId="1"
 #
 # To create/update stack use:
