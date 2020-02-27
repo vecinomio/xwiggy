@@ -8,7 +8,7 @@
 # Environment="Dev" or "Prod"
 # DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
 # DBName="onlinebanking"
-# DBUser="springuser"
+# DBUser="root"
 # DBPassword="abcd1234"
 # KeyName="main-nvirginia"
 # HostedZoneName="miit.pp.ua"
@@ -162,7 +162,7 @@
           - IpProtocol: tcp
             FromPort: 22
             ToPort: 22
-            CidrIp: 0.0.0.0/0
+            CidrIp: 172.16.0.0/16
             Description: SSH access from Bastion-host
           - IpProtocol: tcp
             FromPort: 8080
@@ -172,8 +172,13 @@
           - IpProtocol: icmp
             FromPort: '8'
             ToPort: '-1'
+            SourceSecurityGroupId: !Ref WebserversSecurityGroup
+            Description: allows icmp echo request between resources within SecurityGroup
+          - IpProtocol: icmp
+            FromPort: '8'
+            ToPort: '-1'
             CidrIp: 172.16.0.0/16
-            Description: icmp echo request
+            Description: allows icmp echo request from Bastion-host
         Tags:
           - Key: 'Name'
             Value: !Sub '${AWS::StackName}-webserver-access-sg'
@@ -188,9 +193,10 @@
           Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
         SecurityGroupIngress:
           - IpProtocol: tcp
-            FromPort: 3306
-            ToPort: 3306
-            SourceSecurityGroupId: !Ref WebserversSecurityGroup
+            FromPort: !Ref DBPort
+            ToPort: !Ref DBPort
+            SourceSecurityGroupId: !Ref MainClientSecurityGroup
+            Description: allows access to the Database from ${AWS::StackName} webservers
         Tags:
           - Key: 'Name'
             Value: !Sub '${AWS::StackName}-rds-access-sg'
