@@ -145,6 +145,11 @@
         Port: 8080
         Protocol: HTTP
         TargetType: instance
+        TargetGroupAttributes:
+          - Key: stickiness.enabled
+            Value: true
+          - Key: stickiness.lb_cookie.duration_seconds
+            Value: 86400
         VpcId:
           Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
         Tags:
