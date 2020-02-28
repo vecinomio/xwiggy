@@ -3,18 +3,11 @@
 #    - MYSQL RDS instance for client Database in Private subnets.
 #
 # Add variables:
-# Region="us-east-1"
-# VPCName="RunpleVPC"
-# Environment="Dev" or "Prod"
+# Region="us-east-1" VPCName="RunpleVPC" Environment="Dev" ClientId="1"
 # DBSnapshotARN="arn:aws:rds:us-east-1:899333571677:snapshot:rds-snapshot-masterdb-1ul1sjwpyv1xx"
-# DBName="onlinebanking"
-# DBUser="root"
-# DBPassword="abcd1234"
-# KeyName="main-nvirginia"
-# HostedZoneName="miit.pp.ua"
-# S3Path="s3://online-banking"
-# Application="online-banking-0.0.1-SNAPSHOT.jar"
-# ClientId="1"
+# DBName="onlinebanking" DBUser="root" DBPassword="abcd1234"
+# KeyName="main-nvirginia" HostedZoneName="miit.pp.ua"
+# S3Path="s3://online-banking" Application="online-banking-0.0.1-SNAPSHOT.jar"
 #
 # To create/update stack use:
 # aws cloudformation deploy --stack-name client${ClientId} --template-file ops/cfn/client-all-in-one-al2.yml --parameter-overrides VPCStackName=${Environment}${VPCName} Environment=${Environment} ClientId=${ClientId} DBIdentifier=client${ClientId}db DBSnapshotARN=${DBSnapshotARN} DBName=${DBName} DBUser=${DBUser} DBPassword=${DBPassword} KeyName=${KeyName} HostedZoneName=${HostedZoneName} S3Path=${S3Path} Application=${Application} --capabilities CAPABILITY_NAMED_IAM --region ${Region}
@@ -158,32 +151,48 @@
         GroupDescription: Enable SSH access from Bastion, 8080, icmp Echo Request
         VpcId:
           Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
-        SecurityGroupIngress:
-          - IpProtocol: tcp
-            FromPort: 22
-            ToPort: 22
-            CidrIp: 172.16.0.0/16
-            Description: SSH access from Bastion-host
-          - IpProtocol: tcp
-            FromPort: 8080
-            ToPort: 8080
-            CidrIp: 0.0.0.0/0
-            Description: access to webserver via port 8080
-          - IpProtocol: icmp
-            FromPort: '8'
-            ToPort: '-1'
-            SourceSecurityGroupId: !Ref WebserversSecurityGroup
-            Description: allows icmp echo request between resources within SecurityGroup
-          - IpProtocol: icmp
-            FromPort: '8'
-            ToPort: '-1'
-            CidrIp: 172.16.0.0/16
-            Description: allows icmp echo request from Bastion-host
         Tags:
           - Key: 'Name'
             Value: !Sub '${AWS::StackName}-webserver-access-sg'
           - Key: 'Environment'
             Value: !Ref Environment
+
+    SecurityGroupIngressSSH:
+      Type: AWS::EC2::SecurityGroupIngress
+      Properties:
+        Description: SSH access from Bastion-host
+        GroupId: !Ref WebserversSecurityGroup
+        IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        SourceSecurityGroupId: !ImportValue 'bastion-SG-Id'
+    SecurityGroupIngress8080:
+      Type: AWS::EC2::SecurityGroupIngress
+      Properties:
+        Description: access to webserver via port 8080
+        GroupId: !Ref WebserversSecurityGroup
+        IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        CidrIp: 0.0.0.0/0
+    SecurityGroupIngressWebserversICMP:
+      Type: AWS::EC2::SecurityGroupIngress
+      Properties:
+        Description: allows icmp echo request between resources within SecurityGroup
+        GroupId: !Ref WebserversSecurityGroup
+        IpProtocol: icmp
+        FromPort: '8'
+        ToPort: '-1'
+        SourceSecurityGroupId: !Ref WebserversSecurityGroup
+    SecurityGroupIngressBastionICMP:
+      Type: AWS::EC2::SecurityGroupIngress
+      Properties:
+        Description: allows icmp echo request from Bastion-host
+        GroupId: !Ref WebserversSecurityGroup
+        IpProtocol: icmp
+        FromPort: '8'
+        ToPort: '-1'
+        SourceSecurityGroupId: !ImportValue 'bastion-SG-Id'
 
     RDSAccessSecurityGroup:
       Type: 'AWS::EC2::SecurityGroup'
@@ -192,11 +201,11 @@
         VpcId:
           Fn::ImportValue: !Sub '${VPCStackName}-VPCId'
         SecurityGroupIngress:
-          - IpProtocol: tcp
+          - Description: allows access to the Database from ${AWS::StackName} webservers
+            IpProtocol: tcp
             FromPort: !Ref DBPort
             ToPort: !Ref DBPort
-            SourceSecurityGroupId: !Ref MainClientSecurityGroup
-            Description: allows access to the Database from ${AWS::StackName} webservers
+            SourceSecurityGroupId: !Ref WebserversSecurityGroup
         Tags:
           - Key: 'Name'
             Value: !Sub '${AWS::StackName}-rds-access-sg'
@@ -263,7 +272,7 @@
       Type: AWS::ElasticLoadBalancingV2::TargetGroup
       Properties:
         HealthCheckIntervalSeconds: 10
-        HealthCheckPath: '/'
+        HealthCheckPath: '/index'
         HealthCheckProtocol: HTTP
         HealthCheckTimeoutSeconds: 5
         HealthyThresholdCount: 2
@@ -359,9 +368,9 @@
         LaunchConfigurationName: !Ref clientLaunchConfig
         VPCZoneIdentifier:
           - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet0'
-            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet1'
-            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet2'
-            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet3'
+          - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet1'
+          - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet2'
+          - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet3'
         Tags:
           - Key: 'Name'
             Value: !Sub '${AWS::StackName}-AppASG'
