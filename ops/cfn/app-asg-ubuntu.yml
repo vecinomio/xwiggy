@@ -229,9 +229,9 @@
         LaunchConfigurationName: !Ref clientLaunchConfig
         VPCZoneIdentifier:
           - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet0'
-            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet1'
-            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet2'
-            Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet3'
+          - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet1'
+          - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet2'
+          - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnet3'
         Tags:
           - Key: 'Name'
             Value: !Sub '${AWS::StackName}-App'
